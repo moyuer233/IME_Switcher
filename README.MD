@@ -34,7 +34,7 @@
    ```
 2. 安装依赖（推荐使用虚拟环境）：
    ```bash
-   pip install -r requirements.txt
+   pip install pywin32 pynput pystray pillow py_win_keyboard_layout
    ```
 3. 以管理员身份运行：
    ```bash
