@@ -3,6 +3,7 @@
 
 # 输入法一键切换 (IME Switcher)
 <img width="128" height="128" alt="icon" src="https://github.com/user-attachments/assets/26a1f20e-15a8-45aa-9ad8-75e3c4e80101" />
+
 一个轻量级的 Windows 工具，通过自定义快捷键（键盘或鼠标侧键）一键切换中英文输入法，支持两种切换方式，并提供图形界面和系统托盘。
 
 ---
