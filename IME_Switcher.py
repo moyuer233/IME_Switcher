@@ -14,34 +14,51 @@ import win32api
 import win32con
 import win32event
 import winerror
-
-# ==================== 导入 py_win_keyboard_layout（若无则报错，让用户安装） ====================
 import py_win_keyboard_layout
 
-# ==================== 日志系统（修复无控制台时的 NoneType 错误） ====================
+print(r"""
+#==============================================================================#
+                                                   ___       __       __
+ /'\_/`\                                         /'___`\   /'__`\   /'__`\ 
+/\      \    ___   __  __  __  __     __   _ __ /\_\ /\ \ /\_\L\ \ /\_\L\ \
+\ \ \__\ \  / __`\/\ \/\ \/\ \/\ \  /'__`\/\`'__\/_/// /__\/_/_\_<_\/_/_\_<_ 
+ \ \ \_/\ \/\ \L\ \ \ \_\ \ \ \_\ \/\  __/\ \ \/   // /_\ \ /\ \L\ \ /\ \L\ \ 
+  \ \_\\ \_\ \____/\/`____ \ \____/\ \____\\ \_\  /\______/ \ \____/ \ \____/ 
+   \/_/ \/_/\/___/  `/___/> \/___/  \/____/ \/_/  \/_____/   \/___/   \/___/ 
+                       /\___/ 
+                       \/__/ 
+
+   ██████╗ ███████╗███████╗██████╗ ███████╗███████╗███████╗██╗  ██╗
+   ██╔══██╗██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██║ ██╔╝
+   ██║  ██║█████╗  █████╗  ██████╔╝███████╗█████╗  █████╗  █████╔╝
+   ██║  ██║██╔══╝  ██╔══╝  ██╔═══╝ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗
+   ██████╔╝███████╗███████╗██║     ███████║███████╗███████╗██║  ██╗
+   ╚═════╝ ╚══════╝╚══════╝╚═╝     ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝
+#===============================================================================#
+""")
+# ==================== 日志系统 ====================
 LOG_DIR = os.path.join(os.getenv('APPDATA'), 'IMESwitcher')
 LOG_FILE = os.path.join(LOG_DIR, 'log.txt')
 _log_buffer = []
+
 
 def ensure_log_dir():
     if not os.path.exists(LOG_DIR):
         os.makedirs(LOG_DIR)
 
+
 def log(msg):
     timestamp = time.strftime('%H:%M:%S')
     full_msg = f"[{timestamp}] {msg}"
-    # 安全地输出到控制台（如果存在）
     if sys.stdout is not None:
         print(full_msg)
         sys.stdout.flush()
-    # 写入日志文件（始终执行）
     try:
         ensure_log_dir()
         with open(LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(full_msg + '\n')
     except:
         pass
-    # 更新调试窗口（如果存在）
     if hasattr(sys.modules[__name__], 'debug_text') and sys.modules[__name__].debug_text is not None:
         try:
             sys.modules[__name__].debug_text.insert(tk.END, full_msg + '\n')
@@ -49,7 +66,7 @@ def log(msg):
         except:
             pass
 
-# 用于调试窗口的全局引用
+
 debug_text = None
 
 # ==================== 核心切换逻辑 ====================
@@ -61,16 +78,16 @@ LANG_EN = 0x0409
 LANG_ZH = 0x0804
 last_toggle_time = 0
 
+
 def get_current_lang_id():
     hwnd = user32.GetForegroundWindow()
     thread_id = user32.GetWindowThreadProcessId(hwnd, None)
     hkl = user32.GetKeyboardLayout(thread_id)
     return hkl & 0xFFFF
 
+
 def switch_to_lang_api(target_lang_id):
-    """使用 py_win_keyboard_layout 切换，失败则降级到 CTypes"""
     log(f"API: 尝试切换到 0x{target_lang_id:04X}")
-    # 方法1：py_win_keyboard_layout
     try:
         full_id = int(f"{target_lang_id:08x}{target_lang_id:08x}", 16)
         py_win_keyboard_layout.change_foreground_window_keyboard_layout(full_id)
@@ -78,7 +95,6 @@ def switch_to_lang_api(target_lang_id):
         return True
     except Exception as e:
         log(f"API(py_win_keyboard_layout) 异常: {e}，降级到 CTypes 方案")
-    # 方法2：CTypes
     try:
         hkl = user32.LoadKeyboardLayoutW(f"0x{target_lang_id:08x}", KLF_ACTIVATE)
         if not hkl:
@@ -94,8 +110,8 @@ def switch_to_lang_api(target_lang_id):
         log(f"API(CTypes) 异常: {e}")
         return False
 
+
 def switch_to_lang_simulate(target_lang_id):
-    """模拟 Win+Space（简单可靠）"""
     log("模拟: 发送 Win+Space")
     win32api.keybd_event(win32con.VK_LWIN, 0, 0, 0)
     time.sleep(0.05)
@@ -107,12 +123,14 @@ def switch_to_lang_simulate(target_lang_id):
     log("模拟: 发送完成")
     return True
 
+
 def toggle_ime():
     global last_toggle_time
     now = time.time()
     if now - last_toggle_time < 0.3:
         return
     last_toggle_time = now
+
     current = get_current_lang_id()
     log(f"当前语言ID: 0x{current:04X}")
     if current == LANG_ZH:
@@ -122,30 +140,40 @@ def toggle_ime():
         target = LANG_ZH
         target_name = "中文"
     log(f"切换到 {target_name}")
+
     if SWITCH_METHOD == 1:
         success = switch_to_lang_api(target)
     else:
         success = switch_to_lang_simulate(target)
+
     if success:
         log(f"切换{target_name}指令已执行")
-        time.sleep(0.15)
-        new_lang = get_current_lang_id()
-        if new_lang == target:
-            log(f"✅ 验证成功，当前 {target_name}")
-        else:
-            log(f"❌ 验证失败，当前仍为 0x{new_lang:04X}")
+        threading.Thread(target=verify_switch, args=(target, target_name), daemon=True).start()
     else:
         log(f"切换{target_name}失败")
+
+
+def verify_switch(target, target_name):
+    """独立的验证线程，只验证一次，不阻塞主线程"""
+    time.sleep(0.15)
+    new_lang = get_current_lang_id()
+    if new_lang == target:
+        log(f"✅ 验证成功，当前 {target_name}")
+    else:
+        log(f"❌ 验证失败，当前仍为 0x{new_lang:04X}")
+
 
 # ==================== 配置管理 ====================
 CONFIG_DIR = os.path.join(os.getenv('APPDATA'), 'IMESwitcher')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.json')
 DEFAULT_HOTKEY = 'caps lock'
-SWITCH_METHOD = 1  # 1=API, 2=模拟
+SWITCH_METHOD = 1
+
 
 def ensure_config_dir():
     if not os.path.exists(CONFIG_DIR):
         os.makedirs(CONFIG_DIR)
+
 
 def load_config():
     ensure_config_dir()
@@ -153,15 +181,27 @@ def load_config():
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                return data.get('hotkey', DEFAULT_HOTKEY), data.get('autostart', False), data.get('method', 1)
+                return (
+                    data.get('hotkey', DEFAULT_HOTKEY),
+                    data.get('autostart', False),
+                    data.get('method', 1),
+                    data.get('start_to_tray', False)  # 新增配置
+                )
         except:
             pass
-    return DEFAULT_HOTKEY, False, 1
+    return DEFAULT_HOTKEY, False, 1, False
 
-def save_config(hotkey, autostart, method):
+
+def save_config(hotkey, autostart, method, start_to_tray):
     ensure_config_dir()
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump({'hotkey': hotkey, 'autostart': autostart, 'method': method}, f, indent=2)
+        json.dump({
+            'hotkey': hotkey,
+            'autostart': autostart,
+            'method': method,
+            'start_to_tray': start_to_tray
+        }, f, indent=2)
+
 
 # ==================== 开机自启 ====================
 def set_autostart(enabled):
@@ -182,6 +222,7 @@ def set_autostart(enabled):
         log(f"开机自启设置失败: {e}")
         return False
 
+
 def is_autostart_enabled():
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
@@ -192,24 +233,27 @@ def is_autostart_enabled():
     except:
         return False
 
+
 # ==================== 主应用 ====================
 class App:
     def __init__(self):
         global SWITCH_METHOD
-        saved_hotkey, saved_autostart, saved_method = load_config()
+        saved_hotkey, saved_autostart, saved_method, saved_start_to_tray = load_config()
         self.hotkey_str = saved_hotkey
         self.autostart = saved_autostart
+        self.start_to_tray = saved_start_to_tray
         SWITCH_METHOD = saved_method
 
         self.root = tk.Tk()
         self.root.title("输入法一键切换")
-        self.root.geometry("500x340")
-        self.root.minsize(420, 280)
+        self.root.geometry("500x380")
+        self.root.minsize(420, 300)
         self.root.resizable(True, True)
-        self.root.protocol("WM_DELETE_WINDOW", self.hide_window)
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
         self.hotkey_display_var = tk.StringVar(value=self.hotkey_str)
         self.autostart_var = tk.BooleanVar(value=self.autostart)
+        self.start_to_tray_var = tk.BooleanVar(value=self.start_to_tray)
         self.method_var = tk.IntVar(value=SWITCH_METHOD)
         self.listening = False
         self.listeners = []
@@ -220,11 +264,22 @@ class App:
 
         self.build_ui()
         self.setup_tray()
+
+        # 如果开启了"默认启动到托盘"，则启动时隐藏窗口
+        if self.start_to_tray:
+            self.root.withdraw()
+            log("默认启动到托盘")
+
         if self.autostart:
             self.start_listening()
 
         log("程序启动完成")
-        log(f"热键: {self.hotkey_str}, 方法: {'API' if SWITCH_METHOD==1 else '模拟Win+Space'}")
+        log(f"热键: {self.hotkey_str}, 方法: {'API' if SWITCH_METHOD == 1 else '模拟Win+Space'}")
+
+    def on_close(self):
+        """点击关闭按钮时，最小化到托盘"""
+        self.root.withdraw()
+        log("窗口已隐藏到托盘")
 
     def build_ui(self):
         main_frame = ttk.Frame(self.root, padding=15)
@@ -234,7 +289,7 @@ class App:
         main_frame.columnconfigure(1, weight=1)
         main_frame.columnconfigure(2, weight=0)
         main_frame.columnconfigure(3, weight=0)
-        main_frame.rowconfigure(5, weight=1)
+        main_frame.rowconfigure(6, weight=1)
 
         ttk.Label(main_frame, text="切换热键：").grid(row=0, column=0, sticky='w', pady=5)
 
@@ -252,33 +307,43 @@ class App:
         self.hotkey_label.bind("<Button-1>", self.start_recording)
 
         self.change_btn = ttk.Button(main_frame, text="更改", command=self.start_recording)
-        self.change_btn.grid(row=0, column=2, sticky='w', pady=5, padx=(0,5))
+        self.change_btn.grid(row=0, column=2, sticky='w', pady=5, padx=(0, 5))
 
         self.cancel_btn = ttk.Button(main_frame, text="取消", command=self._cancel_recording)
-        self.cancel_btn.grid(row=0, column=3, sticky='w', pady=5, padx=(0,5))
+        self.cancel_btn.grid(row=0, column=3, sticky='w', pady=5, padx=(0, 5))
         self.cancel_btn.grid_remove()
 
         ttk.Label(main_frame, text="切换方式：").grid(row=1, column=0, sticky='w', pady=5)
         method_frame = ttk.Frame(main_frame)
         method_frame.grid(row=1, column=1, columnspan=3, sticky='w', pady=5)
         ttk.Radiobutton(method_frame, text="API", variable=self.method_var, value=1,
-                       command=self.on_method_change).pack(side=tk.LEFT, padx=5)
+                        command=self.on_method_change).pack(side=tk.LEFT, padx=5)
         ttk.Radiobutton(method_frame, text="模拟", variable=self.method_var, value=2,
-                       command=self.on_method_change).pack(side=tk.LEFT, padx=5)
+                        command=self.on_method_change).pack(side=tk.LEFT, padx=5)
 
+        # 开机自启
         self.autostart_check = ttk.Checkbutton(
             main_frame,
             text="开机自动启动",
             variable=self.autostart_var,
             command=self.on_autostart_toggle
         )
-        self.autostart_check.grid(row=2, column=0, columnspan=4, sticky='w', pady=8)
+        self.autostart_check.grid(row=2, column=0, columnspan=4, sticky='w', pady=5)
+
+        # 默认启动到托盘
+        self.tray_start_check = ttk.Checkbutton(
+            main_frame,
+            text="默认启动到托盘（启动后自动隐藏窗口）",
+            variable=self.start_to_tray_var,
+            command=self.on_tray_start_toggle
+        )
+        self.tray_start_check.grid(row=3, column=0, columnspan=4, sticky='w', pady=5)
 
         self.status_label = ttk.Label(main_frame, text="状态：未启动", foreground='gray')
-        self.status_label.grid(row=3, column=0, columnspan=4, sticky='w', pady=8)
+        self.status_label.grid(row=4, column=0, columnspan=4, sticky='w', pady=8)
 
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.grid(row=4, column=0, columnspan=4, pady=10, sticky='ew')
+        btn_frame.grid(row=5, column=0, columnspan=4, pady=10, sticky='ew')
         btn_frame.columnconfigure(0, weight=1)
         btn_frame.columnconfigure(1, weight=1)
         btn_frame.columnconfigure(2, weight=1)
@@ -302,19 +367,25 @@ class App:
     def on_method_change(self):
         global SWITCH_METHOD
         SWITCH_METHOD = self.method_var.get()
-        save_config(self.hotkey_str, self.autostart_var.get(), SWITCH_METHOD)
-        log(f"切换方式改为: {'API' if SWITCH_METHOD==1 else '模拟'}")
+        save_config(self.hotkey_str, self.autostart_var.get(), SWITCH_METHOD, self.start_to_tray_var.get())
+        log(f"切换方式改为: {'API' if SWITCH_METHOD == 1 else '模拟'}")
 
     def on_autostart_toggle(self):
         enabled = self.autostart_var.get()
         success = set_autostart(enabled)
         if success:
-            save_config(self.hotkey_str, enabled, SWITCH_METHOD)
+            save_config(self.hotkey_str, enabled, SWITCH_METHOD, self.start_to_tray_var.get())
             messagebox.showinfo("提示", f"开机自启{'已启用' if enabled else '已禁用'}")
             log(f"开机自启设置为: {enabled}")
         else:
             messagebox.showerror("错误", "设置开机自启失败，请检查权限")
             self.autostart_var.set(not enabled)
+
+    def on_tray_start_toggle(self):
+        """默认启动到托盘选项变化"""
+        enabled = self.start_to_tray_var.get()
+        save_config(self.hotkey_str, self.autostart_var.get(), SWITCH_METHOD, enabled)
+        log(f"默认启动到托盘: {'已启用' if enabled else '已禁用'}")
 
     # ==================== 热键录制 ====================
     def start_recording(self, event=None):
@@ -352,7 +423,8 @@ class App:
                 key_name = key.char
             else:
                 key_name = str(key).replace('Key.', '')
-            if key_name in ['ctrl', 'shift', 'alt', 'cmd', 'ctrl_l', 'ctrl_r', 'shift_l', 'shift_r', 'alt_l', 'alt_r', 'cmd_l', 'cmd_r']:
+            if key_name in ['ctrl', 'shift', 'alt', 'cmd', 'ctrl_l', 'ctrl_r', 'shift_l', 'shift_r', 'alt_l', 'alt_r',
+                            'cmd_l', 'cmd_r']:
                 return
             if key == keyboard.Key.esc:
                 log("录制取消 (ESC)")
@@ -391,7 +463,7 @@ class App:
         self.hotkey_label.config(bg='white')
         self.change_btn.config(state=tk.NORMAL)
         self.cancel_btn.grid_remove()
-        save_config(self.hotkey_str, self.autostart_var.get(), SWITCH_METHOD)
+        save_config(self.hotkey_str, self.autostart_var.get(), SWITCH_METHOD, self.start_to_tray_var.get())
         log(f"热键已保存: {self.hotkey_str}")
         if self.was_listening:
             self.start_listening()
@@ -528,9 +600,9 @@ class App:
             key_str = str(key)
         if key_str in ['ctrl', 'shift', 'alt', 'cmd', 'ctrl_l', 'ctrl_r', 'shift_l', 'shift_r']:
             return
-        mods_ok = all(self._is_key_pressed(mod) for mod in self.hotkey_parsed['modifiers'])
-        if not mods_ok:
-            return
+        for mod in self.hotkey_parsed['modifiers']:
+            if not self._is_key_pressed(mod):
+                return
         main_key = self.hotkey_parsed['main_key']
         matched = False
         if isinstance(main_key, keyboard.Key):
@@ -551,7 +623,7 @@ class App:
             return
         if button == self.hotkey_parsed['button']:
             log(f"鼠标热键匹配: {button}")
-            self.root.after(0, toggle_ime)
+            self.root.after(100, toggle_ime)
 
     def _is_key_pressed(self, key_obj):
         vk_map = {
@@ -577,7 +649,7 @@ class App:
         self.debug_text = scrolledtext.ScrolledText(frame, wrap=tk.WORD, font=("Consolas", 9))
         self.debug_text.pack(fill=tk.BOTH, expand=True)
         global debug_text
-        debug_text = self.debug_text  # 供 log 函数使用
+        debug_text = self.debug_text
         for msg in _log_buffer:
             self.debug_text.insert(tk.END, msg + '\n')
         self.debug_text.see(tk.END)
@@ -586,21 +658,44 @@ class App:
             global debug_text
             debug_text = None
             self.debug_win.destroy()
+
         self.debug_win.protocol("WM_DELETE_WINDOW", on_close)
 
-    # ==================== 托盘等 ====================
+    # ==================== 系统托盘 ====================
     def setup_tray(self):
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(base_path, 'icon.png')
+        if os.path.exists(icon_path):
+            try:
+                image = Image.open(icon_path)
+                log("已加载本地 icon.png 作为托盘图标")
+            except Exception as e:
+                log(f"加载 icon.png 失败: {e}，使用默认图标")
+                image = self._create_default_icon()
+        else:
+            log("未找到 icon.png，使用默认图标")
+            image = self._create_default_icon()
+        self.tray_icon = pystray.Icon(
+            "ime_switcher",
+            image,
+            "输入法切换",
+            menu=pystray.Menu(
+                pystray.MenuItem("显示设置", self.show_window),
+                pystray.MenuItem("启动", self.start_listening),
+                pystray.MenuItem("停止", self.stop_listening),
+                pystray.MenuItem("退出", self.quit_app)
+            )
+        )
+        threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def _create_default_icon(self):
         image = Image.new('RGB', (64, 64), color='white')
         draw = ImageDraw.Draw(image)
         draw.text((20, 10), "I", fill='black')
-        self.tray_icon = pystray.Icon("ime_switcher", image, "输入法切换",
-                                      menu=pystray.Menu(
-                                          pystray.MenuItem("显示设置", self.show_window),
-                                          pystray.MenuItem("启动", self.start_listening),
-                                          pystray.MenuItem("停止", self.stop_listening),
-                                          pystray.MenuItem("退出", self.quit_app)
-                                      ))
-        threading.Thread(target=self.tray_icon.run, daemon=True).start()
+        return image
 
     def show_window(self, icon=None, item=None):
         self.root.deiconify()
@@ -620,6 +715,7 @@ class App:
     def run(self):
         self.root.mainloop()
 
+
 # ==================== 单实例 ====================
 def check_single_instance():
     mutex_name = "Global\\IMESwitcher_SingleInstance"
@@ -631,6 +727,7 @@ def check_single_instance():
         return True
     except:
         return True
+
 
 # ==================== 入口 ====================
 if __name__ == "__main__":
@@ -652,22 +749,3 @@ if __name__ == "__main__":
 
     app = App()
     app.run()
-
-#==============================================================================#
-#                                                   ___       __       __
-# /'\_/`\                                         /'___`\   /'__`\   /'__`\
-#/\      \    ___   __  __  __  __     __   _ __ /\_\ /\ \ /\_\L\ \ /\_\L\ \
-#\ \ \__\ \  / __`\/\ \/\ \/\ \/\ \  /'__`\/\`'__\/_/// /__\/_/_\_<_\/_/_\_<_
-# \ \ \_/\ \/\ \L\ \ \ \_\ \ \ \_\ \/\  __/\ \ \/   // /_\ \ /\ \L\ \ /\ \L\ \
-#  \ \_\\ \_\ \____/\/`____ \ \____/\ \____\\ \_\  /\______/ \ \____/ \ \____/
-#   \/_/ \/_/\/___/  `/___/> \/___/  \/____/ \/_/  \/_____/   \/___/   \/___/
-#                       /\___/
-#                       \/__/
-#
-#   ██████╗ ███████╗███████╗██████╗ ███████╗███████╗███████╗██╗  ██╗
-#   ██╔══██╗██╔════╝██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██║ ██╔╝
-#   ██║  ██║█████╗  █████╗  ██████╔╝███████╗█████╗  █████╗  █████╔╝
-#   ██║  ██║██╔══╝  ██╔══╝  ██╔═══╝ ╚════██║██╔══╝  ██╔══╝  ██╔═██╗
-#   ██████╔╝███████╗███████╗██║     ███████║███████╗███████╗██║  ██╗
-#   ╚═════╝ ╚══════╝╚══════╝╚═╝     ╚══════╝╚══════╝╚══════╝╚═╝  ╚═╝
-#===============================================================================#
