@@ -2,7 +2,7 @@
 
 # 输入法一键切换 (IME Switcher)
 
-一个轻量级的 Windows 工具，通过自定义快捷键（键盘按键或鼠标侧键）一键切换中英文输入法。**基于 C# NativeAOT 完全重写**，单文件仅约 2.8MB，无任何运行时依赖。
+一个轻量级的 Windows 工具，通过自定义快捷键（键盘按键或鼠标侧键）一键切换中英文输入法。
 
 ---
 
@@ -13,7 +13,7 @@
 - 🔄 **两种切换方式**：
   - **API 模式**：`LoadKeyboardLayout` + `PostMessage(WM_INPUTLANGCHANGEREQUEST)`，自动验证并回退模拟。
   - **模拟模式**：模拟 `Win+Space`，兼容性最强。
-- 🖥️ **PCL 风格界面**：纯 Win32 自绘（无 WinForms/WPF），DirectWrite 文字渲染，GDI+ 平滑圆角，思源黑体 + 微软雅黑，圆角窗口 + 滑块动画。
+- 🖥️ **简约界面**：纯 Win32 自绘（无 WinForms/WPF），DirectWrite 文字渲染，GDI+ 平滑圆角，思源黑体 + 微软雅黑，圆角窗口 + 滑块动画。
 - 🖱️ **系统托盘**：支持最小化到托盘、托盘右键菜单（显示/启动/停止/退出）。
 - 📜 **独立日志窗口**：调试日志独立窗口显示，不遮挡主界面，支持滚动与「手动切换」。
 - 📝 **运行日志**：应用目录持续写入 `run.log`，每次启动自动清理；崩溃时自动转存为 `crash_run_*.log` 并生成崩溃报告。
@@ -24,7 +24,7 @@
 
 ## 📥 下载
 
-访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 **v1.0** 的 `IME_Switcher.exe`，**以管理员身份**运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
+访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，**以管理员身份**运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
 
 ---
 
