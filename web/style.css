@@ -1,0 +1,359 @@
+/* ==========================================================================
+   输入法一键切换 - GitHub 风格 (无边框窗口)
+   白底 · 细边框 · 扁平 · GitHub 蓝
+   ========================================================================== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+:root {
+  --bg: #ffffff;
+  --bg-subtle: #f6f8fa;          /* GitHub 浅灰底 */
+  --border: #d0d7de;             /* GitHub 边框 */
+  --border-muted: #d8dee4;
+  --text: #1f2328;               /* GitHub 主文字 */
+  --text-muted: #57606a;         /* GitHub 次要文字 */
+  --accent: #0969da;             /* GitHub 蓝 */
+  --accent-hover: #0860ca;
+  --accent-subtle: #ddf4ff;      /* GitHub 浅蓝底 */
+  --danger: #cf222e;             /* GitHub 红 */
+  --danger-hover: #a40e26;
+  --success: #1a7f37;            /* GitHub 绿 */
+  --radius: 6px;                 /* GitHub 圆角 */
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- 自定义标题栏（GitHub 顶栏风格） ---------- */
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border-muted);
+  z-index: 10;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+}
+
+.titlebar-logo {
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.titlebar-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.window-controls {
+  display: flex;
+  height: 100%;
+}
+
+.wc-btn {
+  width: 46px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all .12s ease;
+}
+
+.wc-btn:hover {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.wc-close:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* ---------- 主内容 ---------- */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 20px;
+  overflow: hidden;
+}
+
+/* ---------- 状态条 ---------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+  transition: background .25s ease;
+}
+
+.status-dot.status-on  { background: var(--success); }
+.status-dot.status-off { background: var(--border); }
+
+.status-text {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ---------- 卡片（GitHub 面板风格） ---------- */
+.card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 16px 14px;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+/* ---------- 表单行 ---------- */
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.field-label {
+  width: 64px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.hotkey-field {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all .15s ease;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hotkey-field:hover {
+  border-color: var(--accent);
+}
+
+.hotkey-field.recording {
+  background: #fff8c5;
+  border-color: #d4a72c;
+  animation: pulse 1.2s ease infinite;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+kbd {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-muted);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--text);
+}
+
+/* ---------- 单选 / 复选（GitHub 风格） ---------- */
+.radio-group {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.radio, .check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.radio input, .check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.check {
+  display: flex;
+  margin-top: 6px;
+}
+
+/* ---------- 按钮（GitHub 风格） ---------- */
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .12s ease;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 主按钮：GitHub 绿 -> 这里按主色调用蓝 */
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+/* 危险按钮：GitHub 红 */
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-hover);
+}
+
+/* 次要按钮：白底灰边（GitHub 默认按钮） */
+.btn-secondary {
+  background: var(--bg-subtle);
+  color: var(--text);
+  border-color: var(--border);
+  flex: 0 0 auto;
+  padding: 7px 16px;
+  font-size: 12.5px;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #b6bcc4;
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+/* ---------- 调试抽屉（GitHub 风格） ---------- */
+.debug-drawer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  max-height: 260px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-bottom: none;
+  border-top-left-radius: var(--radius);
+  box-shadow: -6px -6px 24px rgba(31, 35, 40, 0.15);
+  transform: translateY(110%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+}
+
+.debug-drawer.open {
+  transform: translateY(0);
+}
+
+.debug-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+.debug-log {
+  padding: 8px 12px;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--text);
+  overflow-y: auto;
+  line-height: 1.6;
+  height: 190px;
+  background: var(--bg-subtle);
+}
+
+/* ---------- 动画 ---------- */
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,167,44,.35); }
+  50%      { box-shadow: 0 0 0 6px rgba(212,167,44,0); }
+}
+
+.hidden { display: none !important; }
+
+/* 滚动条美化 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #afb8c1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #8c959f; }

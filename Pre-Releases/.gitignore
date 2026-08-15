@@ -1,0 +1,11 @@
+.idea/
+.venv/
+pack/
+build/
+dist/
+*.spec
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+*.psd

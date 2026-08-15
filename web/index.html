@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>输入法一键切换</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 自定义标题栏（无边框窗口，GitHub 风格顶栏） -->
+  <!-- pywebview-drag-region：pywebview 官方拖拽机制，仅标题栏可拖动窗口 -->
+  <div id="titlebar" class="titlebar pywebview-drag-region">
+    <div class="titlebar-left">
+      <span class="titlebar-logo">⌨</span>
+      <span class="titlebar-title">输入法一键切换</span>
+    </div>
+    <div class="window-controls">
+      <button id="btnMinimize" class="wc-btn" title="最小化" aria-label="最小化">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="1" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+      <button id="btnClose" class="wc-btn wc-close" title="关闭" aria-label="关闭">
+        <svg width="12" height="12" viewBox="0 0 12 12"><line x1="2" y1="2" x2="10" y2="10" stroke="currentColor" stroke-width="1.4"/><line x1="10" y1="2" x2="2" y2="10" stroke="currentColor" stroke-width="1.4"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- 主内容（GitHub 风格） -->
+  <main class="content">
+
+    <!-- 状态条 -->
+    <div class="statusbar">
+      <span id="statusPill" class="status-dot status-off"></span>
+      <span id="statusText" class="status-text">状态：未启动</span>
+    </div>
+
+    <!-- 卡片一：热键设置 -->
+    <section class="card">
+      <div class="card-title">热键设置</div>
+
+      <div class="row">
+        <div class="field-label">切换热键</div>
+        <div id="switchHotkey" class="hotkey-field">—</div>
+        <button id="btnRecordSwitch" class="btn btn-secondary">更改</button>
+        <button id="btnCancel" class="btn btn-secondary hidden">取消</button>
+      </div>
+
+      <div class="row">
+        <div class="field-label">开关热键</div>
+        <div id="toggleHotkey" class="hotkey-field">未设置</div>
+        <button id="btnRecordToggle" class="btn btn-secondary">更改</button>
+      </div>
+
+      <div class="hint">点击热键框或「更改」后按下键盘按键 / 鼠标侧键（X1/X2），按 <kbd>ESC</kbd> 取消</div>
+    </section>
+
+    <!-- 卡片二：选项设置 -->
+    <section class="card">
+      <div class="card-title">选项</div>
+
+      <div class="row">
+        <div class="field-label">切换方式</div>
+        <div class="radio-group">
+          <label class="radio">
+            <input type="radio" name="method" value="1" checked>
+            <span>API（优先库，失败降级）</span>
+          </label>
+          <label class="radio">
+            <input type="radio" name="method" value="2">
+            <span>模拟（Win+Space）</span>
+          </label>
+        </div>
+      </div>
+
+      <label class="check">
+        <input type="checkbox" id="chkAutostart">
+        <span>开机自动启动</span>
+      </label>
+
+      <label class="check">
+        <input type="checkbox" id="chkTrayStart">
+        <span>默认启动到托盘（启动后自动隐藏窗口）</span>
+      </label>
+    </section>
+
+    <!-- 操作按钮 -->
+    <section class="actions">
+      <button id="btnStart" class="btn btn-primary">启动</button>
+      <button id="btnStop" class="btn btn-danger" disabled>停止</button>
+      <button id="btnManual" class="btn btn-secondary">手动切换</button>
+      <button id="btnDebug" class="btn btn-secondary">调试日志</button>
+    </section>
+  </main>
+
+  <!-- 调试日志抽屉 -->
+  <div id="debugDrawer" class="debug-drawer">
+    <div class="debug-header">
+      <span>调试日志</span>
+      <button id="btnCloseDebug" class="btn btn-secondary btn-sm">关闭</button>
+    </div>
+    <div id="debugLog" class="debug-log"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
