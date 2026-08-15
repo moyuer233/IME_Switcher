@@ -1,0 +1,21 @@
+# IDE
+.idea/
+.vscode/
+
+# .NET 构建产物
+IME_Switcher.CSharp/bin/
+IME_Switcher.CSharp/obj/
+IME_Switcher.CSharp/*.user
+
+# 运行日志与崩溃报告（应用目录下生成）
+**/run.log
+**/crash_*.txt
+**/crash_run_*.log
+
+# Python 遗留文件（由 python-legacy 分支管理）
+__pycache__/
+*.pyc
+
+# 其他
+*.log
+.DS_Store
