@@ -1,6 +1,5 @@
 using System.Drawing;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace IMESwitcher;
 
@@ -97,9 +96,6 @@ internal static partial class NativeMethods
     public const uint TPM_RIGHTBUTTON = 0x2;
     public const uint TPM_RETURNCMD = 0x100;
 
-    // 全局钩子
-    public const uint SMTO_ABORTIFHUNG = 0x0002;
-
     // ---------------- user32 ----------------
     [DllImport("user32.dll")] public static extern bool FillRect(IntPtr hdc, ref RECT lprc, IntPtr hbr);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -117,25 +113,19 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
-    [DllImport("user32.dll")] public static extern UIntPtr SendMessageTimeoutW(IntPtr hWnd, uint Msg, UIntPtr wParam, UIntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-    [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
     [DllImport("user32.dll")] public static extern bool InvalidateRect(IntPtr hWnd, IntPtr lpRect, bool bErase);
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT lpPoint);
-    [DllImport("user32.dll")] public static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
     [DllImport("user32.dll")] public static extern IntPtr SetCapture(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool ReleaseCapture();
     [DllImport("user32.dll")] public static extern IntPtr BeginPaint(IntPtr hWnd, out PAINTSTRUCT lpPaint);
     [DllImport("user32.dll")] public static extern bool EndPaint(IntPtr hWnd, ref PAINTSTRUCT lpPaint);
-    [DllImport("user32.dll")] public static extern IntPtr GetDC(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern IntPtr LoadCursorW(IntPtr hInstance, IntPtr lpCursorName);
     [DllImport("user32.dll")] public static extern uint TrackMouseEvent(ref TRACKMOUSEEVENT lpEventTrack);
     [DllImport("user32.dll")] public static extern bool DestroyWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern void PostQuitMessage(int nExitCode);
-    [DllImport("user32.dll")] public static extern IntPtr GetWindowLongW(IntPtr hWnd, int nIndex);
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern int GetSystemMetrics(int nIndex);
@@ -150,25 +140,12 @@ internal static partial class NativeMethods
     public static extern IntPtr CreateWindowExW(uint dwExStyle, string lpClassName, string lpWindowName,
         uint dwStyle, int x, int y, int nWidth, int nHeight, IntPtr hWndParent, IntPtr hMenu, IntPtr hInstance, IntPtr lpParam);
 
-    // 文本
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    public static extern int DrawTextW(IntPtr hdc, string? lpchText, int cchText, ref RECT lprc, uint format);
-    [DllImport("user32.dll")] public static extern int DrawTextW(IntPtr hdc, StringBuilder? lpchText, int cchText, ref RECT lprc, uint format);
-
     // ---------------- gdi32 ----------------
     [DllImport("gdi32.dll")] public static extern IntPtr CreateSolidBrush(uint crColor);
-    [DllImport("gdi32.dll")] public static extern IntPtr GetStockObject(int fnObject);
     [DllImport("gdi32.dll")] public static extern IntPtr CreatePen(int fnStyle, int nWidth, uint crColor);
     [DllImport("gdi32.dll")] public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
     [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr hObject);
-    [DllImport("gdi32.dll")] public static extern bool RoundRect(IntPtr hdc, int nLeftRect, int nTopRect, int nRightRect, int nBottomRect, int nWidth, int nHeight);
     [DllImport("gdi32.dll")] public static extern bool Ellipse(IntPtr hdc, int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
-    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
-    public static extern IntPtr CreateFontW(int cHeight, int cWidth, int cEscapement, int cOrientation,
-        int cWeight, uint dwItalic, uint dwUnderline, uint dwStrikeOut, uint dwCharSet,
-        uint dwOutputPrecision, uint dwClipPrecision, uint dwQuality, uint dwPitchAndFamily, string pszFaceName);
-    [DllImport("gdi32.dll")] public static extern int SetBkMode(IntPtr hdc, int iBkMode);
-    [DllImport("gdi32.dll")] public static extern uint SetTextColor(IntPtr hdc, uint crColor);
 
     // ---------------- shell32（托盘） ----------------
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]

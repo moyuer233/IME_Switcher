@@ -23,6 +23,9 @@ internal sealed class LogWindow
     private IntPtr _hwnd;
     private bool _created;
 
+    // 双缓冲后备缓冲：创建一次复用（见 EnsureBackBuffer / ReleaseBackBuffer）
+    private IntPtr _memDc, _memBmp, _memOldBmp;
+
     private readonly object _lock = new();
     private readonly List<string> _lines = new();
     private const int MaxLines = 2000;
@@ -156,6 +159,7 @@ internal sealed class LogWindow
                 NativeMethods.ShowWindow(hWnd, NativeMethods.SW_HIDE);
                 return IntPtr.Zero;
             case NativeMethods.WM_DESTROY:
+                ReleaseBackBuffer();
                 _hwnd = IntPtr.Zero;
                 return IntPtr.Zero;
             case WM_REFRESH:
@@ -248,15 +252,29 @@ internal sealed class LogWindow
         NativeMethods.BeginPaint(hWnd, out var ps);
         var hdc = ps.hdc;
         // 双缓冲：先画到内存 DC 再整块拷贝，避免闪烁、提升渲染质量
-        var mem = NativeMethods.CreateCompatibleDC(hdc);
-        var bmp = NativeMethods.CreateCompatibleBitmap(hdc, W, H);
-        var oldBmp = NativeMethods.SelectObject(mem, bmp);
-        Render(mem);
-        NativeMethods.BitBlt(hdc, 0, 0, W, H, mem, 0, 0, 0x00CC0020); // SRCCOPY
-        NativeMethods.SelectObject(mem, oldBmp);
-        NativeMethods.DeleteObject(bmp);
-        NativeMethods.DeleteDC(mem);
+        EnsureBackBuffer(hdc);
+        Render(_memDc);
+        NativeMethods.BitBlt(hdc, 0, 0, W, H, _memDc, 0, 0, 0x00CC0020); // SRCCOPY
         NativeMethods.EndPaint(hWnd, ref ps);
+    }
+
+    /// <summary>后备缓冲按需创建一次并复用（窗口尺寸固定，无需处理尺寸变化）</summary>
+    private void EnsureBackBuffer(IntPtr hdc)
+    {
+        if (_memDc != IntPtr.Zero) return;
+        _memDc = NativeMethods.CreateCompatibleDC(hdc);
+        _memBmp = NativeMethods.CreateCompatibleBitmap(hdc, W, H);
+        _memOldBmp = NativeMethods.SelectObject(_memDc, _memBmp);
+    }
+
+    /// <summary>释放后备缓冲（WM_DESTROY 调用）：漏掉就会在窗口重建时泄漏位图</summary>
+    private void ReleaseBackBuffer()
+    {
+        if (_memDc == IntPtr.Zero) return;
+        if (_memOldBmp != IntPtr.Zero) NativeMethods.SelectObject(_memDc, _memOldBmp);
+        if (_memBmp != IntPtr.Zero) NativeMethods.DeleteObject(_memBmp);
+        NativeMethods.DeleteDC(_memDc);
+        _memDc = _memBmp = _memOldBmp = IntPtr.Zero;
     }
 
     private void Render(IntPtr hdc)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="IMESwitcher.app"/>
+  <assemblyIdentity version="1.1.0.0" name="IMESwitcher.app"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -16,8 +16,11 @@
   </compatibility>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <!-- 界面布局全是硬编码像素，这里显式声明「不感知 DPI」，交给 Windows 统一做位图缩放：
+           任何缩放比例下窗口与文字尺寸都正确（代价是非原生分辨率渲染、略糊）。
+           若改成 true / PerMonitorV2，就必须自行处理 WM_DPICHANGED 并做全套坐标与字号换算，
+           否则高 DPI 屏上界面会明显偏小（v1.1 之前正是如此）。 -->
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">false</dpiAware>
     </windowsSettings>
   </application>
 </assembly>

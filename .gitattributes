@@ -1,0 +1,5 @@
+# 统一换行规范：仓库内一律 LF。
+# 现状（2026-09-11 实测）：所有已跟踪文本文件在仓库中都是 LF，工作区也基本是 LF，
+# 但 core.autocrlf=true 会在重新 checkout 时把工作区转成 CRLF，导致"只改一行却整文件 diff"的伪差异。
+# 显式声明 eol=lf 后，行为不再依赖每台机器的 git 配置。
+* text=auto eol=lf

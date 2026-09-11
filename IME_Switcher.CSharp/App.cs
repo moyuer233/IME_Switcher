@@ -59,13 +59,9 @@ public sealed class App
         bool trayOk = _tray.Add(_win.Handle);
         _hotkey.Start(); // 钩子线程常驻，监听/录制共用
 
-        // 配置 -> UI
-        _win.HotkeyText = string.IsNullOrEmpty(Settings.Hotkey) ? "未设置" : Settings.Hotkey;
-        _win.ToggleText = string.IsNullOrEmpty(Settings.ToggleHotkey) ? "未设置" : Settings.ToggleHotkey;
-        _win.Method = Settings.Method;
-        _win.Autostart = Settings.Autostart;
-        _win.TrayStart = Settings.StartToTray;
-        _win.SyncSwitchAnim();
+        // 配置 -> UI（单一写入通道：刷新与动画初值都由 MainWindow 内部一并处理）
+        _win.SetInitialState(Settings.Hotkey, Settings.ToggleHotkey, Settings.Method,
+            Settings.Autostart, Settings.StartToTray);
 
         Logger.Log("程序启动完成");
         Logger.Log($"热键: {Settings.Hotkey}, 方法: {(Settings.Method == 1 ? "API" : "模拟Win+Space")}");
