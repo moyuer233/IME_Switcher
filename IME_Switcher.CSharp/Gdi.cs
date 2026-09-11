@@ -16,11 +16,9 @@ internal static class Gdi
     public static readonly Font FontNormal = MakeFont("Microsoft YaHei UI", 13, false);
     public static readonly Font FontBold = MakeFont("Microsoft YaHei UI", 13, true);
     public static readonly Font FontSmall = MakeFont("Microsoft YaHei UI", 12, false);
-    public static readonly Font FontTitle = MakeFont("Source Han Sans SC", 15, true);
     public static readonly Font FontCard = MakeFont("Source Han Sans SC", 14, true);
     public static readonly Font FontMono = new("Consolas", 13f, FontStyle.Regular, GraphicsUnit.Pixel);
     public static readonly Font FontSymbol = new("Segoe UI Symbol", 15f, FontStyle.Regular, GraphicsUnit.Pixel);
-    public static readonly Font FontSymbolSmall = new("Segoe UI Symbol", 11f, FontStyle.Regular, GraphicsUnit.Pixel);
 
     private static Font MakeFont(string face, int size, bool bold)
         => new(face, size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
@@ -84,7 +82,13 @@ internal static class Gdi
         g.SmoothingMode = SmoothingMode.AntiAlias;
         g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
         using var brush = new SolidBrush(color);
-        using var sf = new StringFormat { LineAlignment = StringAlignment.Center };
+        using var sf = new StringFormat
+        {
+            LineAlignment = StringAlignment.Center,
+            // 尊重 DT_SINGLELINE：不折行，超宽用省略号（否则长热键会折行并被矩形下半裁掉）
+            FormatFlags = StringFormatFlags.NoWrap,
+            Trimming = StringTrimming.EllipsisCharacter,
+        };
         sf.Alignment = (format & NativeMethods.DT_CENTER) != 0 ? StringAlignment.Center
             : (format & NativeMethods.DT_RIGHT) != 0 ? StringAlignment.Far : StringAlignment.Near;
         g.DrawString(text, font, brush, new RectangleF(r.left, r.top, r.right - r.left, r.bottom - r.top), sf);

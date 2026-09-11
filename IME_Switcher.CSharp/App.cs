@@ -14,6 +14,7 @@ public sealed class App
     private readonly TrayIcon _tray = new();
     private bool _listening;
     private bool _wasListening;
+    private readonly object _stateLock = new(); // 保护 _listening 的 check-then-act（热键回调在后台线程）
 
     public App()
     {
@@ -22,6 +23,23 @@ public sealed class App
 
     public void Run()
     {
+        // 自愈：旧版可能把开关热键存成与切换热键相同（冲突），启动时自动清空开关热键
+        if (!string.IsNullOrEmpty(Settings.ToggleHotkey) &&
+            HotkeyManager.SameHotkey(Settings.Hotkey, Settings.ToggleHotkey))
+        {
+            Logger.Log($"检测到开关热键与切换热键相同（{Settings.ToggleHotkey}），已自动清空开关热键，请重新设置");
+            Settings.ToggleHotkey = "";
+            Config.Save(Settings);
+        }
+        // 自愈：以注册表实际状态为准（用户在任务管理器里禁用自启后，界面不应继续显示"已启用"）
+        bool autostartReal = Config.IsAutostartEnabled();
+        if (Settings.Autostart != autostartReal)
+        {
+            Logger.Log($"开机自启状态校正: 配置={Settings.Autostart} 注册表={autostartReal}");
+            Settings.Autostart = autostartReal;
+            Config.Save(Settings);
+        }
+
         _win = new MainWindow(this);
         if (!_win.Create())
         {
@@ -36,7 +54,9 @@ public sealed class App
             (screenW - MainWindow.W) / 2, (screenH - MainWindow.H) / 2,
             0, 0, 0x0001 | 0x0002); // SWP_NOSIZE | SWP_NOZORDER
 
-        _tray.Add(_win.Handle);
+        // 托盘图标若添加失败就禁止隐藏窗口：窗口是 WS_EX_TOOLWINDOW（无任务栏按钮），
+        // 藏起来又没有托盘入口，用户将再也找不到、也退不掉程序
+        bool trayOk = _tray.Add(_win.Handle);
         _hotkey.Start(); // 钩子线程常驻，监听/录制共用
 
         // 配置 -> UI
@@ -52,7 +72,7 @@ public sealed class App
 
         if (Settings.Autostart || Settings.StartToTray)
             StartListening();
-        if (Settings.StartToTray)
+        if (Settings.StartToTray && trayOk)
             _win.Hide();
 
         // 消息循环
@@ -76,42 +96,63 @@ public sealed class App
 
     public bool StartListening()
     {
-        if (_listening) return true;
-        if (HotkeyManager.ParseHotkey(Settings.Hotkey) == null)
+        // 热键回调在后台线程调用本方法，check-then-act 必须原子，否则连按两次会双 Start/双 Stop（界面与规则表不一致）
+        lock (_stateLock)
         {
-            Logger.Log($"热键解析失败: {Settings.Hotkey}");
-            return false;
-        }
+            if (_listening) return true;
+            if (HotkeyManager.ParseHotkey(Settings.Hotkey) == null)
+            {
+                Logger.Log($"热键解析失败: {Settings.Hotkey}");
+                _win.ShowNotice("切换热键未设置或无效");
+                return false;
+            }
+            // 非法开关热键会被 SetRules 静默丢弃（表现为"设置成功却不生效"），这里清掉并提示
+            if (!string.IsNullOrEmpty(Settings.ToggleHotkey) &&
+                HotkeyManager.ParseHotkey(Settings.ToggleHotkey) == null)
+            {
+                Logger.Log($"开关热键解析失败: {Settings.ToggleHotkey}，已清空");
+                Settings.ToggleHotkey = "";
+                Config.Save(Settings);
+                _win.ShowNotice("开关热键无效，已清空");
+            }
 
-        var rules = new List<(string, Action)>
-        {
-            (Settings.Hotkey, () => ImeSwitcher.ToggleIme(Settings.Method)),
-        };
-        if (!string.IsNullOrEmpty(Settings.ToggleHotkey))
-        {
-            rules.Add((Settings.ToggleHotkey, ToggleListeningFromHotkey));
+            var rules = new List<(string, Action)>
+            {
+                (Settings.Hotkey, () => ImeSwitcher.ToggleIme(Settings.Method)),
+            };
+            if (!string.IsNullOrEmpty(Settings.ToggleHotkey))
+            {
+                rules.Add((Settings.ToggleHotkey, ToggleListeningFromHotkey));
+            }
+            _hotkey.SetRules(rules);
+            _listening = true;
+            Logger.Log($"监听启动，切换热键: {Settings.Hotkey}"
+                + (string.IsNullOrEmpty(Settings.ToggleHotkey) ? "" : $"，开关热键: {Settings.ToggleHotkey}"));
+            _win.SetListeningState(true, Settings.Hotkey, Settings.ToggleHotkey);
+            return true;
         }
-        _hotkey.SetRules(rules);
-        _listening = true;
-        Logger.Log($"监听启动，切换热键: {Settings.Hotkey}"
-            + (string.IsNullOrEmpty(Settings.ToggleHotkey) ? "" : $"，开关热键: {Settings.ToggleHotkey}"));
-        _win.SetListeningState(true, Settings.Hotkey, Settings.ToggleHotkey);
-        return true;
     }
 
     public void StopListening()
     {
-        if (!_listening) return;
-        _hotkey.SetRules(new List<(string, Action)>());
-        _listening = false;
-        Logger.Log("监听已停止");
-        _win.SetListeningState(false, null, null);
+        lock (_stateLock)
+        {
+            if (!_listening) return;
+            _hotkey.SetRules(new List<(string, Action)>());
+            _listening = false;
+            Logger.Log("监听已停止");
+            _win.SetListeningState(false, null, null);
+        }
     }
 
     private void ToggleListeningFromHotkey()
     {
-        if (_listening) StopListening();
-        else StartListening();
+        // lock 可重入：持锁后再调用 Start/StopListening 不会死锁
+        lock (_stateLock)
+        {
+            if (_listening) StopListening();
+            else StartListening();
+        }
     }
 
     public void ManualTest() => ImeSwitcher.ToggleIme(Settings.Method, force: true);
@@ -154,7 +195,9 @@ public sealed class App
     public void StartRecording(string target)
     {
         Logger.WriteDiagnostic($"[dbg] App.StartRecording: target={target}");
-        _wasListening = _listening;
+        // 只在真正进入录制时记录"录制前是否在监听"：录制过程中再点一次"更改"时 _listening 已是 false，
+        // 无条件覆盖会让录制结束后不再恢复监听（全局热键静默失效）
+        if (!_hotkey.Recording) _wasListening = _listening;
         if (_listening) StopListening();
         _win.SetRecordingStarted(target);
         _hotkey.StartRecording(
@@ -172,8 +215,8 @@ public sealed class App
 
     private void FinishRecording(string target, string value)
     {
-        // 开关热键与切换热键不能相同
-        if (target == "toggle" && string.Equals(value, Settings.Hotkey, StringComparison.OrdinalIgnoreCase))
+        // 开关热键与切换热键不能相同（按解析后的规格比较，兼容大小写/旧格式/修饰键顺序）
+        if (target == "toggle" && HotkeyManager.SameHotkey(value, Settings.Hotkey))
         {
             Logger.Log($"开关热键不能与切换热键相同（{value}），已取消设置");
             _win.ShowNotice("开关热键不能与切换热键相同");
@@ -182,7 +225,7 @@ public sealed class App
             return;
         }
         if (target == "hotkey" && !string.IsNullOrEmpty(Settings.ToggleHotkey) &&
-            string.Equals(value, Settings.ToggleHotkey, StringComparison.OrdinalIgnoreCase))
+            HotkeyManager.SameHotkey(value, Settings.ToggleHotkey))
         {
             Logger.Log($"切换热键不能与开关热键相同（{value}），已取消设置");
             _win.ShowNotice("切换热键不能与开关热键相同");
@@ -207,6 +250,12 @@ public sealed class App
 
     public void HideToTray()
     {
+        // 托盘不可用时绝不隐藏：窗口无任务栏按钮，藏了就再没有入口唤出或退出
+        if (!_tray.Added)
+        {
+            Logger.Log("托盘图标不可用，已阻止隐藏窗口");
+            return;
+        }
         if (_win != null) _win.Hide();
         Logger.Log("窗口已隐藏到托盘");
     }

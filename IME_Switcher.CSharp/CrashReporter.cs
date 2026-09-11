@@ -41,6 +41,8 @@ public static class CrashReporter
         sb.AppendLine(new string('-', 60));
         sb.AppendLine(ex?.ToString() ?? "(无异常对象)");
         sb.AppendLine(new string('-', 60));
+        sb.AppendLine($"日志写盘失败次数: {Logger.WriteFailures}"
+            + (Logger.LastWriteError is null ? "" : $"（最近错误: {Logger.LastWriteError}）"));
         sb.AppendLine("最近日志:");
         sb.AppendLine(string.Join("\n", Logger.GetRecent(80)));
         try
@@ -54,16 +56,20 @@ public static class CrashReporter
         catch { }
     }
 
-    /// <summary>把当前运行日志（run.log）转存为崩溃日志（crash_run_*.log）</summary>
+    /// <summary>
+    /// 把运行日志转存为崩溃日志（crash_run_*.log）。
+    /// 直接写内存缓冲，不去复制磁盘上的 run.log —— 日志是异步落盘的，
+    /// 崩溃瞬间磁盘文件可能还不存在（这正是 crash_run_*.log 历史上从未生成过的原因）。
+    /// </summary>
     public static void BackupRunLog()
     {
         try
         {
-            if (File.Exists(Logger.LogFile))
-            {
-                var logPath = Path.Combine(ReportDir, $"crash_run_{DateTime.Now:yyyyMMdd_HHmmss}.log");
-                File.Copy(Logger.LogFile, logPath, true);
-            }
+            var all = Logger.GetAll();
+            if (all.Length == 0) return;
+            Directory.CreateDirectory(ReportDir);
+            var logPath = Path.Combine(ReportDir, $"crash_run_{DateTime.Now:yyyyMMdd_HHmmss}.log");
+            File.WriteAllLines(logPath, all);
         }
         catch { }
     }

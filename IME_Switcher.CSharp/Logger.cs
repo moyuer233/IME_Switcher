@@ -17,6 +17,10 @@ public static class Logger
     private const int MaxQueue = 2000;
     private static bool _started;
 
+    /// <summary>写盘失败次数与最近错误：日志写不进去时必须留痕，否则 run.log 看起来"没有错误"、实际什么都没记</summary>
+    public static int WriteFailures { get; private set; }
+    public static string? LastWriteError { get; private set; }
+
     /// <summary>日志推送到 UI（在后台线程触发，UI 需自行处理线程安全）</summary>
     public static event Action<string>? LogPushed;
 
@@ -27,7 +31,11 @@ public static class Logger
         {
             if (File.Exists(LogFile)) File.Delete(LogFile);
         }
-        catch { }
+        catch (Exception e)
+        {
+            WriteFailures++;
+            LastWriteError = e.Message;
+        }
     }
 
     private static void EnsureStarted()
@@ -59,8 +67,14 @@ public static class Logger
                 var dir = Path.GetDirectoryName(LogFile);
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
                 File.AppendAllText(LogFile, full + "\n");
+                LastWriteError = null;
             }
-            catch { }
+            catch (Exception e)
+            {
+                // 不能在 catch 里再写日志（会递归），只留痕，由崩溃报告暴露出来
+                WriteFailures++;
+                LastWriteError = e.Message;
+            }
 
             lock (Gate)
             {
@@ -105,6 +119,16 @@ public static class Logger
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             File.AppendAllText(LogFile, report + "\n");
         }
-        catch { }
+        catch (Exception e)
+        {
+            WriteFailures++;
+            LastWriteError = e.Message;
+        }
+    }
+
+    /// <summary>内存中保有的全部日志（崩溃转存用：不依赖磁盘 run.log，日志是异步落盘的）</summary>
+    public static string[] GetAll()
+    {
+        lock (Gate) return Buffer.ToArray();
     }
 }

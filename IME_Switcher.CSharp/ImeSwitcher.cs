@@ -44,7 +44,11 @@ public static class ImeSwitcher
             }
             return result.ToArray();
         }
-        catch { return Array.Empty<int>(); }
+        catch (Exception e)
+        {
+            Logger.Log($"读取已安装语言列表失败: {e.Message}");
+            return Array.Empty<int>();
+        }
     }
 
     public static int PickTargetLangId(bool wantChinese)
@@ -80,7 +84,10 @@ public static class ImeSwitcher
                 if (((int)(list[i].ToInt64() & 0xFFFF)) == targetLangId) return list[i];
             }
         }
-        catch { }
+        catch (Exception e)
+        {
+            Logger.Log($"枚举键盘布局失败: {e.Message}");
+        }
         return IntPtr.Zero;
     }
 
@@ -104,7 +111,7 @@ public static class ImeSwitcher
             var hwnd = NativeMethods.GetForegroundWindow();
             var ok = NativeMethods.PostMessageW(hwnd, NativeMethods.WM_INPUTLANGCHANGEREQUEST, IntPtr.Zero, hkl);
             Logger.Log($"API: PostMessageW 返回 {ok}");
-            NativeMethods.NotifyWinEvent(NativeMethods.EVENT_OBJECT_INPUTSTATE, hwnd, 0, 0);
+            NativeMethods.NotifyWinEvent(NativeMethods.EVENT_OBJECT_IME_CHANGE, hwnd, 0, 0);
             return ok;
         }
         catch (Exception e)

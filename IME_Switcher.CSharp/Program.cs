@@ -3,8 +3,15 @@ namespace IMESwitcher;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        // 自检开关：不建窗口、不装钩子，只跑纯逻辑断言（结果写 selftest.txt，退出码 = 失败条数）
+        if (args.Length > 0 && args[0] == "--selftest")
+        {
+            Environment.Exit(SelfTest());
+            return;
+        }
+
         Logger.Reset(); // 每次启动清理旧运行日志
         CrashReporter.Install();
         NativeCrashFilter.Install(); // 原生崩溃（AV 等）捕获，写 crash_native_*.txt
@@ -13,11 +20,16 @@ internal static class Program
         using var mutex = new Mutex(true, @"Global\IMESwitcher_SingleInstance", out bool createdNew);
         if (!createdNew)
         {
-            var hwnd = NativeMethods.FindWindowW(null, "输入法一键切换");
+            // 按已注册的窗口类名查找（不要按窗口标题找：标题是界面文案，改文案/多语言就静默失效）
+            var hwnd = NativeMethods.FindWindowW(MainWindow.ClassName, null);
             if (hwnd != IntPtr.Zero)
             {
-                NativeMethods.ShowWindow(hwnd, NativeMethods.SW_SHOW);
+                NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE); // 已最小化的窗口用 SW_SHOW 无效
                 NativeMethods.SetForegroundWindow(hwnd);
+            }
+            else
+            {
+                Logger.Log("已有实例在运行，但未找到其窗口（可能托盘图标不可用或窗口尚未创建）");
             }
             return;
         }
@@ -26,5 +38,58 @@ internal static class Program
         app.Run();
 
         try { mutex.ReleaseMutex(); } catch { }
+    }
+
+    /// <summary>
+    /// 热键逻辑自检（`IME_Switcher.exe --selftest`）。
+    /// 覆盖三处易回归的逻辑：ParseHotkey 对 "num +" 这类含 '+' 键名的切分、
+    /// SameHotkey 的"同键异名"等价类、修饰键必须精确匹配。返回失败条数（0 = 全过）。
+    /// </summary>
+    private static int SelfTest()
+    {
+        var lines = new List<string>();
+        int failed = 0;
+        void Check(string name, bool ok)
+        {
+            lines.Add($"{(ok ? "PASS" : "FAIL")}  {name}");
+            if (!ok) failed++;
+        }
+
+        var ctrlNumPlus = HotkeyManager.ParseHotkey("ctrl+num +");
+        Check("ParseHotkey(\"num +\") 主键为 \"num +\"", HotkeyManager.ParseHotkey("num +")?.MainKey == "num +");
+        Check("ParseHotkey(\"ctrl+num +\") 主键 num + 且只有 ctrl 修饰",
+            ctrlNumPlus is { MainKey: "num +" } s1 && s1.Modifiers.Count == 1 && s1.Modifiers[0] == "ctrl");
+        Check("ParseHotkey(\"f5\") 主键为 \"f5\"", HotkeyManager.ParseHotkey("f5")?.MainKey == "f5");
+        Check("ParseHotkey(\"caps lock\") 主键为 \"caps lock\"",
+            HotkeyManager.ParseHotkey("caps lock")?.MainKey == "caps lock");
+
+        Check("SameHotkey 忽略大小写", HotkeyManager.SameHotkey("Caps Lock", "caps lock"));
+        Check("SameHotkey 忽略修饰键顺序", HotkeyManager.SameHotkey("shift+ctrl+a", "ctrl+shift+a"));
+        Check("SameHotkey 兼容旧格式 vk107 与 num +", HotkeyManager.SameHotkey("num +", "vk107"));
+        Check("SameHotkey 兼容旧格式 vk116 与 f5", HotkeyManager.SameHotkey("f5", "vk116"));
+        Check("SameHotkey 区分不同主键", !HotkeyManager.SameHotkey("ctrl+a", "ctrl+b"));
+        Check("SameHotkey 区分鼠标键", !HotkeyManager.SameHotkey("mouse.x1", "mouse.x2"));
+        Check("SameHotkey 鼠标键忽略大小写", HotkeyManager.SameHotkey("mouse.x1", "Mouse.X1"));
+        Check("SameHotkey 区分键与鼠标", !HotkeyManager.SameHotkey("mouse.x1", "caps lock"));
+        Check("SameHotkey 空串不算同一热键", !HotkeyManager.SameHotkey("", ""));
+        Check("SameHotkey 区分有无修饰键", !HotkeyManager.SameHotkey("ctrl+num +", "num +"));
+
+        var caps = HotkeyManager.ParseHotkey("caps lock")!;
+        var ctrlA = HotkeyManager.ParseHotkey("ctrl+a")!;
+        var ctrlShiftA = HotkeyManager.ParseHotkey("ctrl+shift+a")!;
+        Check("修饰键：无修饰键热键在按着 ctrl 时不触发", !HotkeyManager.ModifiersMatch(caps, m => m == "ctrl"));
+        Check("修饰键：无修饰键热键在无修饰键时触发", HotkeyManager.ModifiersMatch(caps, _ => false));
+        Check("修饰键：要求 ctrl 且按下 ctrl 时触发", HotkeyManager.ModifiersMatch(ctrlA, m => m == "ctrl"));
+        Check("修饰键：要求 ctrl 但没按 ctrl 时不触发", !HotkeyManager.ModifiersMatch(ctrlA, _ => false));
+        Check("修饰键：要求 ctrl 却多按 shift 时不触发", !HotkeyManager.ModifiersMatch(ctrlA, m => m is "ctrl" or "shift"));
+        Check("修饰键：要求 ctrl+shift 且两者都按下时触发",
+            HotkeyManager.ModifiersMatch(ctrlShiftA, m => m is "ctrl" or "shift"));
+
+        var report = string.Join(Environment.NewLine, lines);
+        var path = Path.Combine(CrashReporter.ReportDir, "selftest.txt");
+        try { File.WriteAllText(path, report + Environment.NewLine); } catch { }
+        Console.WriteLine(report);
+        Console.WriteLine(failed == 0 ? $"ALL PASS ({lines.Count})" : $"{failed} FAILED / {lines.Count}");
+        return failed;
     }
 }

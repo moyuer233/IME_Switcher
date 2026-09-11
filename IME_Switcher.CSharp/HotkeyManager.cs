@@ -62,9 +62,13 @@ public sealed class HotkeyManager : IDisposable
     public void Stop()
     {
         _running = false;
-        if (_hookThread != null && _hookThread.IsAlive)
+        var t = _hookThread;
+        if (t is { IsAlive: true })
         {
-            _hookThread.Join(1000);
+            // 钩子线程阻塞在 GetMessageW 上，必须投递 WM_QUIT 唤醒它，
+            // 否则 Join 必然超时、UnhookWindowsHookEx 永远执行不到（钩子残留到进程结束）
+            NativeMethods.PostThreadMessageW((uint)t.ManagedThreadId, NativeMethods.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
+            t.Join(1000);
         }
         _hookThread = null;
     }
@@ -158,6 +162,20 @@ public sealed class HotkeyManager : IDisposable
 
     private static bool ModDown(uint vk) => NativeMethods.GetAsyncKeyState((int)vk) < 0;
 
+    /// <summary>
+    /// 修饰键是否与规格完全一致：要求的都按下，且没有多余修饰键按下。
+    /// 缺这条判定时，把 Caps Lock 设为热键后按 Ctrl+CapsLock / Shift+CapsLock 也会误触发切换。
+    /// isDown 作为参数注入，便于 --selftest 脱离真实键盘状态验证本逻辑。
+    /// </summary>
+    public static bool ModifiersMatch(HotkeySpec spec, Func<string, bool> isDown)
+    {
+        foreach (var m in ModifierNames)
+        {
+            if (isDown(m) != spec.Modifiers.Contains(m)) return false;
+        }
+        return true;
+    }
+
     public static HotkeySpec? ParseHotkey(string hotkey)
     {
         if (string.IsNullOrWhiteSpace(hotkey)) return null;
@@ -170,15 +188,48 @@ public sealed class HotkeyManager : IDisposable
         }
 
         var parts = hotkey.Split('+');
-        var main = parts[^1].Trim().ToLowerInvariant();
+        int modEnd = parts.Length - 1;
+        var main = parts[modEnd].Trim().ToLowerInvariant();
+        // 兼容 "num +" / "num -" 这类键名本身含 '+' 的情况：Split 后末段为空，
+        // 主键应取"前一段 + '+'"，例如 "num +" → ["num ",""] → main="num +"；"ctrl+num +" → main="num +"，修饰键=["ctrl"]
+        // 注意：先拼接再整体 Trim，保留 "num +" 中空格（Trim 会把 "num " 的空格吃掉拼成 "num+"，查表失败）
+        if (main.Length == 0 && modEnd > 0)
+        {
+            main = (parts[modEnd - 1] + "+").Trim().ToLowerInvariant();
+            modEnd--;
+        }
         var spec = new HotkeySpec { Type = HotkeySpec.TypeKeyboard, MainKey = main };
-        for (int i = 0; i < parts.Length - 1; i++)
+        for (int i = 0; i < modEnd; i++)
         {
             var m = parts[i].Trim().ToLowerInvariant();
             if (Array.IndexOf(ModifierNames, m) >= 0)
                 spec.Modifiers.Add(m);
         }
         return spec;
+    }
+
+    /// <summary>
+    /// 两个热键字符串是否表示同一物理热键。
+    /// 按解析后的规格比较：键盘比较主键 VK 码 + 修饰键集合（忽略大小写、顺序、
+    /// 旧格式 "vk107" 与 "num +" 等同键异名），鼠标比较按钮。
+    /// 防止 "caps lock" vs "Caps Lock"、"shift+ctrl+a" vs "ctrl+shift+a" 等漏判。
+    /// </summary>
+    public static bool SameHotkey(string a, string b)
+    {
+        // 空值/空串视为"未设置"，不算同一热键（调用方需先判空）
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+        if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return true;
+        var sa = ParseHotkey(a);
+        var sb = ParseHotkey(b);
+        if (sa == null || sb == null) return false;
+        if (sa.Type != sb.Type) return false;
+        if (sa.Type == HotkeySpec.TypeMouse)
+            return sa.MouseButton == sb.MouseButton;
+        if (NameToVk(sa.MainKey) != NameToVk(sb.MainKey)) return false;
+        if (sa.Modifiers.Count != sb.Modifiers.Count) return false;
+        foreach (var m in sa.Modifiers)
+            if (!sb.Modifiers.Contains(m)) return false;
+        return true;
     }
 
     private IntPtr KeyboardProc(int nCode, IntPtr wParam, IntPtr lParam)
@@ -192,7 +243,7 @@ public sealed class HotkeyManager : IDisposable
                 uint vk = data.vkCode;
                 if (_recording)
                 {
-                    Logger.WriteDiagnostic($"[dbg] 键盘钩子捕获: vk=0x{vk:X2}, 进入录制");
+                    Logger.Log($"录制按键: vk=0x{vk:X2}"); // 钩子回调内只入队，绝不同步写磁盘
                     HandleRecordingKey(vk);
                 }
                 else
@@ -217,12 +268,7 @@ public sealed class HotkeyManager : IDisposable
                 // 用 VK 码比较，兼容任意名称格式（"num +"、"vk107"、"enter" 等）
                 var specVk = NameToVk(spec.MainKey);
                 if (specVk == 0 || specVk != vk) continue;
-                bool ok = true;
-                foreach (var m in spec.Modifiers)
-                {
-                    if (!ModDown(ModVk(m))) { ok = false; break; }
-                }
-                if (ok) { hit = (spec, cb); break; }
+                if (ModifiersMatch(spec, m => ModDown(ModVk(m)))) { hit = (spec, cb); break; }
             }
         }
         if (hit != null)
@@ -243,24 +289,19 @@ public sealed class HotkeyManager : IDisposable
                 var ms = Marshal.PtrToStructure<NativeMethods.MSLLHOOKSTRUCT>(lParam);
                 int xbtn = (int)((ms.mouseData >> 16) & 0xFFFF);
                 if (xbtn == 0) xbtn = (int)(ms.mouseData & 0xFFFF); // 兼容部分设备
-                Logger.WriteDiagnostic($"[dbg] 鼠标钩子收到 XBUTTONDOWN: mouseData=0x{ms.mouseData:X}, xbtn=0x{xbtn:X}, recording={_recording}");
                 string btn = xbtn == NativeMethods.XBUTTON1 ? "x1" :
                              xbtn == NativeMethods.XBUTTON2 ? "x2" : "";
                 if (btn.Length > 0)
                 {
-                    Logger.WriteDiagnostic($"[dbg] 鼠标钩子捕获 XBUTTON: btn={btn}, recording={_recording}");
+                    // 注意：钩子回调里绝不能做同步磁盘 I/O（超 LowLevelHooksTimeout 会被系统静默摘掉钩子），
+                    // 因此这里不做任何逐次诊断日志
                     if (_recording)
                     {
                         var on = _onRecorded;
                         if (on != null)
                         {
                             _recording = false;
-                            Logger.WriteDiagnostic($"[dbg] 鼠标录制完成，触发回调: mouse.{btn}");
                             Task.Run(() => on($"mouse.{btn}"));
-                        }
-                        else
-                        {
-                            Logger.WriteDiagnostic("[dbg] 鼠标录制: _onRecorded 为空，未触发");
                         }
                         return NativeMethods.CallNextHookEx(_mouseHook, nCode, wParam, lParam);
                     }
@@ -310,7 +351,6 @@ public sealed class HotkeyManager : IDisposable
     private void HandleRecordingKey(uint vk)
     {
         var name = VkToName(vk);
-        Logger.WriteDiagnostic($"[dbg] 录制按键: {name}");
         if (Array.IndexOf(ModifierNames, name) >= 0) return;
         if (name == "win") return;
         if (name == "esc")

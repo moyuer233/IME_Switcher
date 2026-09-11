@@ -32,8 +32,10 @@ public static class NativeCrashFilter
                 nint exRecord = Marshal.ReadIntPtr(exceptionInfo);
                 if (exRecord != 0)
                 {
-                    code = (uint)Marshal.ReadInt32(exRecord); // ExceptionCode
-                    addr = Marshal.ReadIntPtr(exRecord, 8);    // ExceptionAddress
+                    code = (uint)Marshal.ReadInt32(exRecord); // ExceptionCode 在偏移 0
+                    // EXCEPTION_RECORD 布局：ExceptionCode(0)/ExceptionFlags(4)/ExceptionRecord(8)/ExceptionAddress(16 或 12)
+                    // 必须按指针大小取 ExceptionAddress；取偏移 8 得到的是内层异常记录指针，地址将永远不可信
+                    addr = Marshal.ReadIntPtr(exRecord, IntPtr.Size == 8 ? 16 : 12);
                 }
             }
             var sb = new StringBuilder();

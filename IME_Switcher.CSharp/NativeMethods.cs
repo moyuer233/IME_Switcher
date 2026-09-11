@@ -14,7 +14,8 @@ internal static partial class NativeMethods
     public const byte VK_LWIN = 0x5B;
     public const byte VK_SPACE = 0x20;
     public const uint KEYEVENTF_KEYUP = 0x0002;
-    public const uint EVENT_OBJECT_INPUTSTATE = 0x8000;
+    // 输入法状态变化事件（旧值 0x8000 其实是 EVENT_OBJECT_CREATE，通知无效）
+    public const uint EVENT_OBJECT_IME_CHANGE = 0x8025;
 
     // 窗口样式/消息
     public const uint WS_POPUP = 0x80000000;
@@ -36,12 +37,14 @@ internal static partial class NativeMethods
     public const uint WM_DPICHANGED = 0x02E0;
     public const uint WM_SYSCOMMAND = 0x0112;
     public const uint WM_TIMER = 0x0113;
+    public const uint WM_QUIT = 0x0012;
     public const uint WM_USER = 0x0400;
     public const uint WM_TRAYICON = WM_USER + 1;
 
     public const int SW_SHOW = 5;
     public const int SW_HIDE = 0;
     public const int SW_MINIMIZE = 6;
+    public const int SW_RESTORE = 9;
     public const IntPtr HTCAPTION = 2;
 
     // 鼠标
@@ -197,7 +200,10 @@ internal static partial class NativeMethods
     [DllImport("user32.dll")] public static extern IntPtr SetWindowsHookEx(int idHook, HookProc lpfn, IntPtr hMod, uint dwThreadId);
     [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(IntPtr hhk);
     [DllImport("user32.dll")] public static extern IntPtr CallNextHookEx(IntPtr hhk, int nCode, IntPtr wParam, IntPtr lParam);
-    [DllImport("user32.dll")] public static extern bool GetMessageW(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+    // GetMessage 返回 BOOL(int)，其中 -1 表示错误；默认 marshaling 会把 -1 当 true，导致消息循环永不退出
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetMessageW(out MSG lpMsg, IntPtr hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+    [DllImport("user32.dll")] public static extern bool PostThreadMessageW(uint idThread, uint Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern bool TranslateMessage(ref MSG lpMsg);
     [DllImport("user32.dll")] public static extern IntPtr DispatchMessage(ref MSG lpMsg);
     [DllImport("kernel32.dll")] public static extern IntPtr GetModuleHandle(string? lpModuleName);

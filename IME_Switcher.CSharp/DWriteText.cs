@@ -13,7 +13,7 @@ internal static class DWriteText
     private static readonly object Gate = new();
     private static IDWriteFactory? _dw;
     private static ID2D1DCRenderTarget? _rt;
-    private static readonly Dictionary<(string, float, bool), IDWriteTextFormat> Formats = new();
+    private static readonly Dictionary<(string, float, bool, uint), IDWriteTextFormat> Formats = new();
     private static bool _failed;
 
     public static bool TryDraw(IntPtr hdc, string text, NativeMethods.RECT rect, Color color,
@@ -25,17 +25,19 @@ internal static class DWriteText
             var rt = EnsureReady();
             if (rt == null) return false;
 
-            var fmt = GetFormat(face, size, bold);
-            fmt.SetTextAlignment(align == 1 ? 2 : align == 2 ? 1 : 0); // 左/中/右
-            fmt.SetParagraphAlignment(2); // 垂直居中
+            var fmt = GetFormat(face, size, bold, align);
+            if (fmt == null) return false;
 
             var colorF = new D2D1_COLOR_F
             {
                 r = color.R / 255f, g = color.G / 255f, b = color.B / 255f, a = 1f,
             };
-            rt.BindDC(hdc, ref rect);
-            rt.BeginDraw();
-            rt.CreateSolidColorBrush(ref colorF, IntPtr.Zero, out var brush);
+            if (rt.BindDC(hdc, ref rect) < 0) return false;
+            // 画刷先建好并判空：把 IntPtr.Zero 当画刷传给 DrawText 是非法参数，可能直接触发原生 AV
+            if (rt.CreateSolidColorBrush(ref colorF, IntPtr.Zero, out var brush) < 0 || brush == IntPtr.Zero)
+                return false;
+            if (rt.BeginDraw() < 0) { Marshal.Release(brush); return false; }
+
             var lr = new D2D1_RECT_F { left = rect.left, top = rect.top, right = rect.right, bottom = rect.bottom };
             var fmtPtr = Marshal.GetIUnknownForObject(fmt);
             try
@@ -45,15 +47,29 @@ internal static class DWriteText
             finally
             {
                 Marshal.Release(fmtPtr);
+                Marshal.Release(brush); // 放进 finally：DrawText/EndDraw 抛异常时也不泄漏
             }
-            rt.EndDraw(IntPtr.Zero, IntPtr.Zero);
-            if (brush != IntPtr.Zero) Marshal.Release(brush);
-            return true;
+            // EndDraw 返回 D2DERR_RECREATE_TARGET(0x8899000C) 表示渲染目标已失效（锁屏 / RDP / 显示器切换），
+            // 必须丢弃 _rt 让下次重建，否则文字永久消失且这里仍会谎报成功
+            int hr = rt.EndDraw(IntPtr.Zero, IntPtr.Zero);
+            if (hr == unchecked((int)0x8899000C)) _rt = null;
+            return hr >= 0;
         }
-        catch
+        catch (Exception e)
         {
+            LogFailure(e);
             return false; // 回退由调用方处理
         }
+    }
+
+    private static bool _failureLogged;
+
+    /// <summary>失败只记一次，避免每帧刷屏</summary>
+    private static void LogFailure(Exception e)
+    {
+        if (_failureLogged) return;
+        _failureLogged = true;
+        Logger.Log($"DirectWrite 文字渲染异常，已回退 GDI+: {e.Message}");
     }
 
     private static ID2D1DCRenderTarget? EnsureReady()
@@ -81,19 +97,28 @@ internal static class DWriteText
                 _rt = rt;
                 _rt.SetTextAntialiasMode(1); // D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE（PCL/WPF 同款）
             }
-            catch
+            catch (Exception e)
             {
                 _failed = true;
+                LogFailure(e);
             }
             return _rt;
         }
     }
 
-    private static IDWriteTextFormat GetFormat(string face, float size, bool bold)
+    /// <summary>
+    /// 按 (字体, 字号, 粗体, 对齐) 缓存格式对象。
+    /// 对齐原先写在共享对象上、每次绘制都改写它 —— 那是跨线程可见的全局可变状态，因此并入缓存键。
+    /// </summary>
+    private static IDWriteTextFormat? GetFormat(string face, float size, bool bold, uint align)
     {
-        var key = (face, size, bold);
+        var key = (face, size, bold, align);
         if (Formats.TryGetValue(key, out var f)) return f;
-        _dw!.CreateTextFormat(face, IntPtr.Zero, bold ? 700 : 400, 0, 5, size, "zh-cn", out var fmt);
+        int hr = _dw!.CreateTextFormat(face, IntPtr.Zero, bold ? 700 : 400, 0, 5, size, "zh-cn", out var fmt);
+        if (hr < 0 || fmt == null) return null;
+        fmt.SetTextAlignment(align == 1 ? 2 : align == 2 ? 1 : 0); // 左/中/右
+        fmt.SetParagraphAlignment(2); // 垂直居中
+        fmt.SetWordWrapping(1);       // DWRITE_WORD_WRAPPING_NO_WRAP：单行文本不折行
         Formats[key] = fmt;
         return fmt;
     }
@@ -142,6 +167,8 @@ internal static class DWriteText
         [PreserveSig] int SetTextAlignment(int textAlignment);
         [PreserveSig] int GetTextAlignment();
         [PreserveSig] int SetParagraphAlignment(int paragraphAlignment);
+        [PreserveSig] int GetParagraphAlignment(); // vtable 槽位不能跳过：SetWordWrapping 紧随其后
+        [PreserveSig] int SetWordWrapping(int wordWrapping);
     }
 
     [ComImport, Guid("06152247-6f50-465a-9245-118bfd3b6007"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]

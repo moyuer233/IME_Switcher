@@ -11,7 +11,8 @@ namespace IMESwitcher;
 internal sealed class MainWindow
 {
     public const int W = 560;
-    public const int H = 660;
+    public const int H = 500; // 内容到 y=478 结束：原 660 会在底部留 182px 空白
+    public const string ClassName = "IMESwitcherMain"; // 单实例激活按类名查找（比按窗口标题可靠，标题只是界面文案）
     public const uint WM_REFRESH = NativeMethods.WM_USER + 2;
 
     private static NativeMethods.WndProc? _wndProcDelegate; // 保持委托引用防止 GC
@@ -69,13 +70,13 @@ internal sealed class MainWindow
             lpfnWndProc = _wndProcDelegate,
             hInstance = NativeMethods.GetModuleHandle(null),
             hCursor = NativeMethods.LoadCursorW(IntPtr.Zero, new IntPtr(32512)), // IDC_ARROW
-            lpszClassName = "IMESwitcherMain",
+            lpszClassName = ClassName,
         };
         if (NativeMethods.RegisterClassW(ref wc) == 0) return false;
 
         _hwnd = NativeMethods.CreateWindowExW(
             NativeMethods.WS_EX_TOOLWINDOW,
-            "IMESwitcherMain", "输入法一键切换",
+            ClassName, "输入法一键切换",
             NativeMethods.WS_POPUP | NativeMethods.WS_VISIBLE,
             100, 100, W, H, IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
         if (_hwnd != IntPtr.Zero)
@@ -117,6 +118,12 @@ internal sealed class MainWindow
         if (_hwnd != IntPtr.Zero) NativeMethods.InvalidateRect(_hwnd, IntPtr.Zero, false);
     }
 
+    /// <summary>线程安全的刷新请求：热键回调跑在后台线程，统一投递消息交给 UI 线程重绘</summary>
+    private void PostRefresh()
+    {
+        if (_hwnd != IntPtr.Zero) NativeMethods.PostMessageW(_hwnd, WM_REFRESH, IntPtr.Zero, IntPtr.Zero);
+    }
+
     public void SetListeningState(bool on, string? hotkey, string? toggle)
     {
         Listening = on;
@@ -125,13 +132,13 @@ internal sealed class MainWindow
             HotkeyText = string.IsNullOrEmpty(hotkey) ? "未设置" : hotkey;
             ToggleText = string.IsNullOrEmpty(toggle) ? "未设置" : toggle;
         }
-        Invalidate();
+        PostRefresh();
     }
 
     public void SetRecordingStarted(string? target)
     {
         RecordingTarget = target;
-        Invalidate();
+        PostRefresh();
     }
 
     public void SetRecordingFinished(string? target, string? value)
@@ -139,13 +146,13 @@ internal sealed class MainWindow
         RecordingTarget = null;
         if (target == "toggle") ToggleText = string.IsNullOrEmpty(value) ? "未设置" : value;
         else HotkeyText = string.IsNullOrEmpty(value) ? "未设置" : value;
-        Invalidate();
+        PostRefresh();
     }
 
     public void SetRecordingCanceled()
     {
         RecordingTarget = null;
-        Invalidate();
+        PostRefresh();
     }
 
     // ---------------- 窗口消息 ----------------
@@ -191,7 +198,7 @@ internal sealed class MainWindow
                     NativeMethods.KillTimer(_hwnd, new IntPtr(NoticeTimerId));
                     Invalidate();
                 }
-                else
+                else if (wParam.ToInt32() == AnimTimerId)
                 {
                     OnTimer();
                 }
@@ -297,6 +304,10 @@ internal sealed class MainWindow
             NativeMethods.SendMessage(_hwnd, NativeMethods.WM_NCLBUTTONDOWN, NativeMethods.HTCAPTION, IntPtr.Zero);
             _pressed = UiId.None;
         }
+        else if (id != UiId.None)
+        {
+            NativeMethods.SetCapture(_hwnd); // 捕获鼠标：拖到窗口外松开也能收到 WM_LBUTTONUP，否则按下态会一直粘住
+        }
         Invalidate();
     }
 
@@ -304,6 +315,7 @@ internal sealed class MainWindow
     {
         var id = _pressed;
         _pressed = UiId.None;
+        NativeMethods.ReleaseCapture();
         Invalidate();
         if (id != UiId.None && id == _hover)
             OnClick(id);
@@ -388,9 +400,10 @@ internal sealed class MainWindow
     /// <summary>显示短暂红色提示（如热键冲突）</summary>
     public void ShowNotice(string text)
     {
+        if (_hwnd == IntPtr.Zero) return; // 窗口未建好时 SetTimer 会被静默忽略，提示永远不显示
         Notice = text;
         NativeMethods.SetTimer(_hwnd, new IntPtr(NoticeTimerId), 5000, IntPtr.Zero);
-        Invalidate();
+        PostRefresh();
     }
 
     private void StartSwitchAnim()
@@ -537,9 +550,8 @@ internal sealed class MainWindow
         else
             Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom, Theme.Card, Theme.Radius);
         Gdi.DrawBorder(hdc, r, Theme.Border, Theme.Radius);
-        var color = text.StartsWith("按下") ? Theme.Text : Theme.Text;
         Gdi.Text(hdc, text, new NativeMethods.RECT { left = r.left, top = r.top, right = r.right, bottom = r.bottom },
-            color, Gdi.FontBold, NativeMethods.DT_CENTER | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE);
+            Theme.Text, Gdi.FontBold, NativeMethods.DT_CENTER | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE);
     }
 
     private void RenderOptionsCard(IntPtr hdc)

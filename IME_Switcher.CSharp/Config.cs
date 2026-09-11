@@ -33,7 +33,11 @@ public static class Config
                 if (cfg != null) return cfg;
             }
         }
-        catch { }
+        catch (Exception e)
+        {
+            // 配置损坏时静默回退会让用户设置"莫名丢失"，必须留痕
+            Logger.Log($"配置读取失败，已使用默认值: {e.Message}");
+        }
         return new AppConfig();
     }
 
@@ -44,7 +48,10 @@ public static class Config
             Directory.CreateDirectory(Dir);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(cfg, ConfigJsonContext.Default.AppConfig));
         }
-        catch { }
+        catch (Exception e)
+        {
+            Logger.Log($"配置保存失败: {e.Message}");
+        }
     }
 
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -62,7 +69,11 @@ public static class Config
                 key.DeleteValue(ValueName, false);
             return true;
         }
-        catch { return false; }
+        catch (Exception e)
+        {
+            Logger.Log($"写开机自启注册表失败: {e.Message}");
+            return false;
+        }
     }
 
     public static bool IsAutostartEnabled()
@@ -72,6 +83,10 @@ public static class Config
             using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKeyPath);
             return key?.GetValue(ValueName) != null;
         }
-        catch { return false; }
+        catch (Exception e)
+        {
+            Logger.Log($"读开机自启注册表失败: {e.Message}");
+            return false;
+        }
     }
 }

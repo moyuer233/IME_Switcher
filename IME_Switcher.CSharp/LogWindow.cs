@@ -12,7 +12,11 @@ internal sealed class LogWindow
     public const int W = 620;
     public const int H = 440;
     private const int TitleH = 32;
+    private const int LineH = 17; // 日志行高：滚轮夹紧与渲染必须共用同一算式，否则首行永远滚不到
     private const uint WM_REFRESH = NativeMethods.WM_USER + 3;
+
+    /// <summary>日志区可显示的行数（日志区上下各留 8 / 12 像素边距）</summary>
+    private static int VisibleLines => (H - TitleH - 20) / LineH;
 
     private static NativeMethods.WndProc? _wndProcDelegate; // 保持委托引用防止 GC
     private readonly App _app;
@@ -28,6 +32,7 @@ internal sealed class LogWindow
     private bool _hoverManual;
     private bool _pressedClose;
     private bool _pressedManual;
+    private bool _mouseInWindow;
 
     public IntPtr Handle => _hwnd;
 
@@ -54,7 +59,6 @@ internal sealed class LogWindow
     {
         if (!_created)
         {
-            _created = true;
             _wndProcDelegate = WndProc;
             var wc = new NativeMethods.WNDCLASSW
             {
@@ -64,20 +68,33 @@ internal sealed class LogWindow
                 hCursor = NativeMethods.LoadCursorW(IntPtr.Zero, new IntPtr(32512)),
                 lpszClassName = "IMESwitcherLog",
             };
-            NativeMethods.RegisterClassW(ref wc);
+            if (NativeMethods.RegisterClassW(ref wc) == 0)
+            {
+                Logger.Log("日志窗口类注册失败");
+                return;
+            }
             _hwnd = NativeMethods.CreateWindowExW(
                 NativeMethods.WS_EX_TOOLWINDOW,
                 "IMESwitcherLog", "调试日志",
                 NativeMethods.WS_POPUP | NativeMethods.WS_VISIBLE,
                 120, 120, W, H, IntPtr.Zero, IntPtr.Zero, wc.hInstance, IntPtr.Zero);
-            if (_hwnd != IntPtr.Zero)
+            if (_hwnd == IntPtr.Zero)
             {
-                int round = NativeMethods.DWMWCP_ROUND;
-                NativeMethods.DwmSetWindowAttribute(_hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
+                Logger.Log("日志窗口创建失败");
+                return; // 不置 _created：否则一次失败后就永久打不开
             }
+            _created = true;
 
-            foreach (var line in Logger.GetRecent(MaxLines))
-                OnLog(line);
+            int round = NativeMethods.DWMWCP_ROUND;
+            NativeMethods.DwmSetWindowAttribute(_hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
+
+            // 一次性回填历史日志（逐行调用 OnLog 会白发上千条消息）
+            lock (_lock)
+            {
+                _lines.Clear();
+                _lines.AddRange(Logger.GetRecent(MaxLines));
+                _scroll = 0;
+            }
         }
         if (_hwnd != IntPtr.Zero)
         {
@@ -122,6 +139,13 @@ internal sealed class LogWindow
             case NativeMethods.WM_MOUSEMOVE:
                 OnMove(lParam);
                 return IntPtr.Zero;
+            case NativeMethods.WM_MOUSELEAVE:
+                // 没有这一支，鼠标移出窗口后 hover 高亮会永久粘住
+                _hoverClose = false;
+                _hoverManual = false;
+                _mouseInWindow = false;
+                NativeMethods.InvalidateRect(hWnd, IntPtr.Zero, false);
+                return IntPtr.Zero;
             case NativeMethods.WM_LBUTTONDOWN:
                 OnDown(lParam);
                 return IntPtr.Zero;
@@ -155,6 +179,17 @@ internal sealed class LogWindow
             _hoverManual = hm;
             NativeMethods.InvalidateRect(_hwnd, IntPtr.Zero, false);
         }
+        if (!_mouseInWindow)
+        {
+            _mouseInWindow = true;
+            var tme = new NativeMethods.TRACKMOUSEEVENT
+            {
+                cbSize = (uint)Marshal.SizeOf<NativeMethods.TRACKMOUSEEVENT>(),
+                dwFlags = NativeMethods.TME_LEAVE,
+                hwndTrack = _hwnd,
+            };
+            NativeMethods.TrackMouseEvent(ref tme);
+        }
     }
 
     private void OnDown(IntPtr lParam)
@@ -165,9 +200,11 @@ internal sealed class LogWindow
         {
             case Hit.BtnClose:
                 _pressedClose = true;
+                NativeMethods.SetCapture(_hwnd); // 捕获鼠标：拖到窗口外松开也能收到 WM_LBUTTONUP
                 break;
             case Hit.BtnManual:
                 _pressedManual = true;
+                NativeMethods.SetCapture(_hwnd);
                 break;
             case Hit.Title:
                 // 拖动窗口
@@ -192,6 +229,7 @@ internal sealed class LogWindow
         }
         _pressedClose = false;
         _pressedManual = false;
+        NativeMethods.ReleaseCapture();
         NativeMethods.InvalidateRect(_hwnd, IntPtr.Zero, false);
     }
 
@@ -200,8 +238,7 @@ internal sealed class LogWindow
         int delta = (short)((wParam.ToInt64() >> 16) & 0xFFFF);
         lock (_lock)
         {
-            var visible = (H - TitleH - 8) / 17;
-            _scroll = Math.Clamp(_scroll - (delta > 0 ? 3 : -3), 0, Math.Max(0, _lines.Count - visible));
+            _scroll = Math.Clamp(_scroll - (delta > 0 ? 3 : -3), 0, Math.Max(0, _lines.Count - VisibleLines));
         }
         NativeMethods.InvalidateRect(_hwnd, IntPtr.Zero, false);
     }
@@ -245,12 +282,11 @@ internal sealed class LogWindow
 
         lock (_lock)
         {
-            var visible = (lr.bottom - lr.top) / 17;
-            int start = Math.Max(0, _lines.Count - visible - _scroll);
+            int start = Math.Max(0, _lines.Count - VisibleLines - _scroll);
             int y = lr.top + 4;
-            for (int i = start; i < _lines.Count && y < lr.bottom; i++, y += 17)
+            for (int i = start; i < _lines.Count && y < lr.bottom; i++, y += LineH)
             {
-                var r = new NativeMethods.RECT { left = lr.left + 8, top = y, right = lr.right - 8, bottom = y + 17 };
+                var r = new NativeMethods.RECT { left = lr.left + 8, top = y, right = lr.right - 8, bottom = y + LineH };
                 Gdi.Text(hdc, _lines[i], r, Theme.Text, Gdi.FontMono,
                     NativeMethods.DT_LEFT | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE);
             }
