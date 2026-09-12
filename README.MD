@@ -5,7 +5,6 @@
 ![license](https://img.shields.io/github/license/moyuer233/IME_Switcher)
 ![release](https://img.shields.io/github/v/release/moyuer233/IME_Switcher)
 ![downloads](https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total)
-
 ![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4)
 ![.NET](https://img.shields.io/badge/.NET-9-512BD4)
 ![NativeAOT](https://img.shields.io/badge/NativeAOT-single%20file-5C2D91)
