@@ -1,19 +1,23 @@
-<img width="128" height="128" alt="icon" src="https://github.com/user-attachments/assets/26a1f20e-15a8-45aa-9ad8-75e3c4e80101" />
+<p align="center">
+  <a href="https://github.com/moyuer233/IME_Switcher"><img src="https://github.com/user-attachments/assets/26a1f20e-15a8-45aa-9ad8-75e3c4e80101" width="200" height="200" alt="IME Switcher"></a>
+</p>
 
 <div align="center">
 
-![license](https://img.shields.io/github/license/moyuer233/IME_Switcher)
-![release](https://img.shields.io/github/v/release/moyuer233/IME_Switcher)
-![downloads](https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total)
-![platform](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4)
-![.NET](https://img.shields.io/badge/.NET-9-512BD4)
-![NativeAOT](https://img.shields.io/badge/NativeAOT-single%20file-5C2D91)
+# 输入法一键切换 (IME Switcher)
+
+_✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中英文输入法 ✨_
 
 </div>
 
-# 输入法一键切换 (IME Switcher)
-
-一个轻量级的 Windows 工具，通过自定义快捷键（键盘按键或鼠标侧键）一键切换中英文输入法。
+<p align="center">
+  <img src="https://img.shields.io/github/license/moyuer233/IME_Switcher" alt="license">
+  <img src="https://img.shields.io/github/v/release/moyuer233/IME_Switcher" alt="release">
+  <img src="https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total" alt="downloads">
+  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4" alt="platform">
+  <img src="https://img.shields.io/badge/.NET-9-512BD4" alt=".NET">
+  <img src="https://img.shields.io/badge/NativeAOT-single%20file-5C2D91" alt="NativeAOT">
+</p>
 
 ## 功能
 
