@@ -21,7 +21,7 @@ pack/
 .venv/
 Pre-Releases/
 *.spec
-*.psd
+icon.psd
 
 # 本地备份目录（含 user.npmrc.bak 等敏感文件，绝不入库）
 _backup_*/
