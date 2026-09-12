@@ -14,6 +14,9 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
   <img src="https://img.shields.io/github/license/moyuer233/IME_Switcher" alt="license">
   <img src="https://img.shields.io/github/v/release/moyuer233/IME_Switcher" alt="release">
   <img src="https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total" alt="downloads">
+  <img src="https://img.shields.io/github/commit-activity/m/moyuer233/IME_Switcher" alt="commit activity">
+  <img src="https://img.shields.io/github/last-commit/moyuer233/IME_Switcher" alt="last commit">
+  <br>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4" alt="platform">
   <img src="https://img.shields.io/badge/.NET-9-512BD4" alt=".NET">
   <img src="https://img.shields.io/badge/NativeAOT-single%20file-5C2D91" alt="NativeAOT">
