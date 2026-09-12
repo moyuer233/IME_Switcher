@@ -15,35 +15,25 @@
   热键解析/比较逻辑有内置自检 `IME_Switcher.exe --selftest`（20 条断言，退出码 = 失败条数）。
 - 许可证 MIT；Python + pynput 的旧实现保留在 `python-legacy` 分支，已废弃不再维护。
 
-## README 与素材规范（2026-09-13 用户要求）
+## README 与素材规范（2026-09-13）
 
 - README 头部按 nonebot2 三段式（全局铁律 24）：logo → `# 名字` + 斜体一句话 → 徽章一行，三块都居中。
-- **logo 必须透明底，且分深浅两版**：这张图是黑字设计，深色主题下黑字看不见，而不透明的白底方块在深色下又刺眼。
-  用 GitHub 支持的 `<picture>` + `prefers-color-scheme` 切换：
-
-  ```html
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="icon512-white.png">
-    <img src="icon512-transparent.png" width="200" height="200" alt="IME Switcher">
-  </picture>
-  ```
-
-- 仓库根目录现有素材与用途：
+- **logo 就用用户自制的 `icon512x.png`**（512×512，白底不透明），显示 200×200。
+  源图是 512，所以高分屏也不糊；放大别超过源图的一半。
+- ⚠️ **不要再做"透明底 + 深浅双版本"**（2026-09-13 做过一次，用户判定效果差、已回退）：
+  这张是黑字设计 —— 把白底抠成透明后，深色主题下黑字几乎看不见；配 `<picture>` + `prefers-color-scheme`
+  又要长期维护两个文件。当时生成的 `icon512-transparent.png` / `icon512-white.png` 已从仓库删除，
+  要看那次的实现就 `git show 3473e47`。**结论：原图直接用，别再抠底。**
+- 素材与用途：
 
   | 文件 | 用途 |
   |---|---|
-  | `icon512x.png` | 原始源图（512×512，白底不透明，只作生成素材，README 不引用） |
-  | `icon512-transparent.png` | 抠掉白底的黑字版，浅色主题用 |
-  | `icon512-white.png` | 同形状白字版，深色主题用 |
+  | `icon512x.png` | README 头部 logo（512×512，白底不透明） |
   | `icon.ico` | 应用图标（`.csproj` 的 `ApplicationIcon` 引用，128×128） |
+  | `icon*.psd` | 设计稿，**不入库**（`.gitignore` 已忽略 `*.psd`） |
 
-- 重新生成的步骤（不引入新依赖，用系统自带 `System.Drawing`；改完图要重跑并肉眼验两种主题）：
-
-  1. 抠底：逐像素 `alpha = round((255 - 感知亮度) × 原alpha / 255)`，RGB 一律置 0 —— 这样字形的抗锯齿边会转成半透明，白底变成全透明。
-  2. 白字版：在同一张结果上把 RGB 置 255、保留 alpha。
-  3. 验证：把结果分别叠到 `#0d1117`（GitHub 深色底）与 `#ffffff` 上各看一遍。
-- 显示尺寸统一 **200×200**（nonebot2 同规格）；源图 512 是为了高 DPI 不糊，别再放大超过源图 1/2。
-- **`*.psd` 设计稿不入库**：体积大、二进制、改一行看不出差异；本仓库有过 `git add -A` 扫进不该提交文件的先例，加文件只 `git add` 具体路径。
+- 换 logo：直接替换 `icon512x.png`（保持 512×512）即可，README 不用动；必要时看一眼深色主题下的观感。
+- 加文件只 `git add` 具体路径，**别用 `git add -A`** —— 本仓库有过把不该提交的文件扫进去的先例。
 
 ## 记忆路径
 

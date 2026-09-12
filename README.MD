@@ -1,10 +1,5 @@
 <p align="center">
-  <a href="https://github.com/moyuer233/IME_Switcher">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="icon512-white.png">
-      <img src="icon512-transparent.png" width="200" height="200" alt="IME Switcher">
-    </picture>
-  </a>
+  <a href="https://github.com/moyuer233/IME_Switcher"><img src="icon512x.png" width="200" height="200" alt="IME Switcher"></a>
 </p>
 
 <div align="center">
