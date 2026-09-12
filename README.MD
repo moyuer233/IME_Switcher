@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/moyuer233/IME_Switcher"><img src="https://github.com/user-attachments/assets/26a1f20e-15a8-45aa-9ad8-75e3c4e80101" width="200" height="200" alt="IME Switcher"></a>
+  <a href="https://github.com/moyuer233/IME_Switcher"><img src="icon512x.png" width="200" height="200" alt="IME Switcher"></a>
 </p>
 
 <div align="center">
