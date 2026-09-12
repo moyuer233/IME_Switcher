@@ -23,6 +23,9 @@ Pre-Releases/
 *.spec
 icon.psd
 
+# 本地备份目录（含 user.npmrc.bak 等敏感文件，绝不入库）
+_backup_*/
+
 # 其他
 *.log
 .DS_Store
