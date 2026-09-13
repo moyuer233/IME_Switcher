@@ -36,7 +36,7 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
 
 ## 下载
 
-访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
+当前版本 `1.2.0`。访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
 
 ## 使用说明
 
