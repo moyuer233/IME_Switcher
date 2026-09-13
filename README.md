@@ -70,7 +70,7 @@ dotnet publish -c Release -r win-x64 --self-contained true
 IME_Switcher.exe --selftest
 ```
 
-### 技术栈
+## 技术栈
 
 - C# / .NET 9 NativeAOT（自包含单文件，体积 5MB 以内）
 - 纯 Win32 API（GDI / GDI+ / DirectWrite / D2D / DWM）自绘界面
@@ -91,10 +91,10 @@ A：某些应用（如游戏、UWP 应用）可能不支持 API 切换，请在�
 Q：程序需要管理员权限？
 A：全局键盘/鼠标钩子需要管理员权限，程序启动时会自动请求。建议在应用程序兼容性选项卡里勾选“以管理员身份运行此程序”。
 
+<img width="465" height="644" alt="兼容性设置里勾选「以管理员身份运行此程序」" src="https://github.com/user-attachments/assets/57b4efe1-540f-40c0-8569-13dc580050d5" />
+
 Q：开了开机自启，每次登录都弹 UAC？
 A：程序以 `requireAdministrator` 运行，登录自启时 Windows 必定会请求一次权限确认，这是系统行为。若不希望弹窗，可关闭「开机自动启动」改为手动启动。
-
-<img width="465" height="644" alt="屏幕截图 2026-08-12 130221" src="https://github.com/user-attachments/assets/57b4efe1-540f-40c0-8569-13dc580050d5" />
 
 Q：运行日志在哪？
 A：程序所在目录下的 `run.log`（每次启动自动清空，因此该目录需可写）。崩溃时自动生成 `crash_*.txt`（报告）和 `crash_run_*.log`（完整运行日志）。
