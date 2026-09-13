@@ -21,7 +21,10 @@ pack/
 .venv/
 Pre-Releases/
 *.spec
-icon.psd
+*.psd
+
+# 内部画图产物（架构图与可视化检查，不上仓库）
+_diagrams/
 
 # 本地备份目录（含 user.npmrc.bak 等敏感文件，绝不入库）
 _backup_*/
