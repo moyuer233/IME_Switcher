@@ -46,7 +46,11 @@ public static class Config
         try
         {
             Directory.CreateDirectory(Dir);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(cfg, ConfigJsonContext.Default.AppConfig));
+            // 原子替换：先写临时文件再 Move 覆盖。直接覆盖写一旦写到一半被杀/断电，
+            // config.json 会变成截断的 JSON，下次 Load 走 catch 静默回默认值（表现为"设置莫名丢失"）
+            var tmp = FilePath + ".tmp";
+            File.WriteAllText(tmp, JsonSerializer.Serialize(cfg, ConfigJsonContext.Default.AppConfig));
+            File.Move(tmp, FilePath, overwrite: true);
         }
         catch (Exception e)
         {

@@ -7,13 +7,18 @@ namespace IMESwitcher;
 public sealed class App
 {
     public AppConfig Settings { get; private set; }
-    public bool Quitting { get; private set; }
+
+    /// <summary>退出中标记。置位后所有入口都拒绝新的工作 —— 退出瞬间队列/线程池里可能还有热键回调，
+    /// 它们会去操作已销毁的窗口。volatile：UI 线程写、回调线程读。</summary>
+    public volatile bool Quitting;
 
     private MainWindow _win = null!;
     private readonly HotkeyManager _hotkey = new();
     private readonly TrayIcon _tray = new();
     private bool _listening;
     private bool _wasListening;
+    // 供热键回调线程读的不可变快照：Settings 被 UI 线程写、回调线程读，直接共享不安全
+    private volatile int _methodSnapshot = 1;
     private readonly object _stateLock = new(); // 保护 _listening 的 check-then-act（热键回调在后台线程）
 
     public App()
@@ -86,12 +91,16 @@ public sealed class App
     {
         _hotkey.Dispose();
         _tray.Dispose();
+        Logger.Log("资源已清理");
+        Logger.Shutdown(); // 必须放在最后：把队列里剩下的行写完再让进程结束，
+                           // 否则后台日志线程被直接掐死，run.log 看不到退出原因
     }
 
     // ---------------- 监听 ----------------
 
     public bool StartListening()
     {
+        if (Quitting) return false; // 退出中不再启动新工作
         // 热键回调在后台线程调用本方法，check-then-act 必须原子，否则连按两次会双 Start/双 Stop（界面与规则表不一致）
         lock (_stateLock)
         {
@@ -114,7 +123,7 @@ public sealed class App
 
             var rules = new List<(string, Action)>
             {
-                (Settings.Hotkey, () => ImeSwitcher.ToggleIme(Settings.Method)),
+                (Settings.Hotkey, () => ImeSwitcher.ToggleIme(_methodSnapshot)),
             };
             if (!string.IsNullOrEmpty(Settings.ToggleHotkey))
             {
@@ -129,6 +138,10 @@ public sealed class App
         }
     }
 
+    /// <summary>
+    /// 停止监听。**刻意不检查 Quitting** —— 这是清理路径，退出时必须能执行；
+    /// 只是退出中不再碰 UI（窗口可能已销毁）。
+    /// </summary>
     public void StopListening()
     {
         lock (_stateLock)
@@ -137,12 +150,13 @@ public sealed class App
             _hotkey.SetRules(new List<(string, Action)>());
             _listening = false;
             Logger.Log("监听已停止");
-            _win.SetListeningState(false, null, null);
+            if (!Quitting) _win.SetListeningState(false, null, null);
         }
     }
 
     private void ToggleListeningFromHotkey()
     {
+        if (Quitting) return;
         // lock 可重入：持锁后再调用 Start/StopListening 不会死锁
         lock (_stateLock)
         {
@@ -159,6 +173,7 @@ public sealed class App
     {
         Settings.Method = method;
         Config.Save(Settings);
+        _methodSnapshot = method; // 快照与配置一起更新：热键回调线程下次读到的就是新值
         _win.Method = method;
         _win.Refresh();
         Logger.Log($"切换方式改为: {(method == 1 ? "API" : "模拟")}");
@@ -175,6 +190,11 @@ public sealed class App
             _win.Refresh();
             Logger.Log($"开机自启设置为: {enabled}");
         }
+        else
+        {
+            // 写注册表失败时界面原本毫无反馈，用户看着像"点了没用"
+            _win.ShowNotice("开机自启设置失败（请检查注册表权限）");
+        }
     }
 
     public void SetTrayStart(bool enabled)
@@ -190,6 +210,7 @@ public sealed class App
 
     public void StartRecording(string target)
     {
+        if (Quitting) return;
         Logger.WriteDiagnostic($"[dbg] App.StartRecording: target={target}");
         // 只在真正进入录制时记录"录制前是否在监听"：录制过程中再点一次"更改"时 _listening 已是 false，
         // 无条件覆盖会让录制结束后不再恢复监听（全局热键静默失效）
@@ -203,6 +224,7 @@ public sealed class App
 
     public void CancelRecording()
     {
+        if (Quitting) return;
         Logger.WriteDiagnostic("[dbg] App.CancelRecording");
         _hotkey.CancelRecording();
         _win.SetRecordingCanceled();
@@ -211,6 +233,7 @@ public sealed class App
 
     private void FinishRecording(string target, string value)
     {
+        if (Quitting) return;
         // 开关热键与切换热键不能相同（按解析后的规格比较，兼容大小写/旧格式/修饰键顺序）
         if (target == "toggle" && HotkeyManager.SameHotkey(value, Settings.Hotkey))
         {

@@ -13,13 +13,18 @@ public static class ImeSwitcher
     public const int LANG_EN = 0x0409;
     public const int LANG_ZH = 0x0804;
 
-    private static DateTime _lastToggle = DateTime.MinValue;
+    private static long _lastToggleTicks; // 上次切换的时间戳（Ticks），0 = 从未切换
     private const double DebounceSeconds = 0.3;
+    private static readonly long DebounceTicks = (long)(DebounceSeconds * TimeSpan.TicksPerSecond);
 
     public static int GetCurrentLangId()
     {
         var hwnd = NativeMethods.GetForegroundWindow();
+        // 没有前台窗口时不能落到 GetKeyboardLayout(0) —— 那个参数是"线程 id"，
+        // 传 0 会读成**调用线程自己**的输入法布局，语义完全不同（会误判中英、切换方向反了）
+        if (hwnd == IntPtr.Zero) return 0;
         var tid = NativeMethods.GetWindowThreadProcessId(hwnd, out _);
+        if (tid == 0) return 0; // 窗口正在销毁
         var hkl = NativeMethods.GetKeyboardLayout(tid);
         return (int)(hkl.ToInt64() & 0xFFFF);
     }
@@ -157,15 +162,21 @@ public static class ImeSwitcher
     /// </summary>
     public static void ToggleIme(int method, bool force = false)
     {
-        if ((DateTime.Now - _lastToggle).TotalSeconds < DebounceSeconds) return;
-        _lastToggle = DateTime.Now;
+        // 去抖的 check-then-act 必须原子：热键回调都跑在线程池上，
+        // 并发时会双双通过检查、一次按键发出两条切换指令
+        long now = DateTime.Now.Ticks;
+        long prev = Interlocked.Read(ref _lastToggleTicks);
+        if (prev != 0 && now - prev < DebounceTicks) return;
+        if (Interlocked.CompareExchange(ref _lastToggleTicks, now, prev) != prev) return;
 
-        if (!force && IsOwnWindow(NativeMethods.GetForegroundWindow()))
+        // 前台窗口只取一次：两次调用之间前台可能已经换了，后面的判断必须用同一个句柄
+        var fg = NativeMethods.GetForegroundWindow();
+        if (!force && IsOwnWindow(fg))
         {
             Logger.Log("主窗口在前台，请切换到目标应用后使用热键");
             return;
         }
-        if (IsOwnWindow(NativeMethods.GetForegroundWindow()))
+        if (IsOwnWindow(fg))
         {
             Logger.Log("前台为自身窗口，手动切换使用模拟方式（系统级切换）");
             method = 2;
@@ -179,6 +190,14 @@ public static class ImeSwitcher
         string targetName = wantChinese ? "中文" : "英文";
         Logger.Log($"切换到 {targetName} (目标 0x{target:X4})");
 
+        // 切换 + 验证 + 回退整段丢到后台：API 模式要等 150ms 验证是否生效、模拟模式要连发按键（3×50ms），
+        // 留在调用者线程上会把 UI 卡住 300~450ms（「手动切换」按钮就是从 UI 线程调进来的）
+        Task.Run(() => RunToggle(method, target, targetName));
+    }
+
+    /// <summary>实际执行切换（含 API 未生效时回退模拟）。会阻塞几百毫秒，只能在后台线程上跑。</summary>
+    private static void RunToggle(int method, int target, string targetName)
+    {
         bool success;
         if (method == 1)
         {

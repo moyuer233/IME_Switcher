@@ -23,14 +23,16 @@ internal sealed class MainWindow
     // 双缓冲后备缓冲：创建一次复用（见 EnsureBackBuffer / ReleaseBackBuffer）
     private IntPtr _memDc, _memBmp, _memOldBmp;
 
-    // 状态（UI 线程读写；App 通过方法更新）
-    public bool Listening;
-    public string HotkeyText = "未设置";
-    public string ToggleText = "未设置";
-    public string? RecordingTarget;
-    public int Method = 1;
-    public bool Autostart;
-    public bool TrayStart;
+    // 状态（UI 线程读写；App 通过方法更新）。
+    // 这些字段被后台线程（热键回调、日志线程）写、UI 线程读，加 volatile 保证可见性 ——
+    // 光靠 PostMessage(WM_REFRESH) 只能保证"刷新消息"送达，管不了字段值本身的可见性。
+    public volatile bool Listening;
+    public volatile string HotkeyText = "未设置";
+    public volatile string ToggleText = "未设置";
+    public volatile string? RecordingTarget;
+    public volatile int Method = 1;
+    public volatile bool Autostart;
+    public volatile bool TrayStart;
 
     // 交互状态
     private UiId _hover;
@@ -44,8 +46,8 @@ internal sealed class MainWindow
     private const int AnimTimerId = 1;
     private const int NoticeTimerId = 2;
 
-    // 提示消息（红色，短暂显示）
-    public string? Notice;
+    // 提示消息（红色，短暂显示）。后台线程会写（SetAutostart 失败提示等），故 volatile
+    public volatile string? Notice;
 
     // 独立调试日志窗口
     private readonly LogWindow _logWin;

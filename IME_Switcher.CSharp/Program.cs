@@ -24,7 +24,10 @@ internal static class Program
             var hwnd = NativeMethods.FindWindowW(MainWindow.ClassName, null);
             if (hwnd != IntPtr.Zero)
             {
-                NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE); // 已最小化的窗口用 SW_SHOW 无效
+                // 隐藏（默认启动到托盘时窗口是隐藏的）用 SW_RESTORE 不会显示窗口，必须分流：
+                // 隐藏 → SW_SHOW；最小化 → SW_RESTORE。否则表现为"双击 exe 毫无反应"
+                NativeMethods.ShowWindow(hwnd,
+                    NativeMethods.IsWindowVisible(hwnd) ? NativeMethods.SW_RESTORE : NativeMethods.SW_SHOW);
                 NativeMethods.SetForegroundWindow(hwnd);
             }
             else
@@ -84,6 +87,17 @@ internal static class Program
         Check("修饰键：要求 ctrl 却多按 shift 时不触发", !HotkeyManager.ModifiersMatch(ctrlA, m => m is "ctrl" or "shift"));
         Check("修饰键：要求 ctrl+shift 且两者都按下时触发",
             HotkeyManager.ModifiersMatch(ctrlShiftA, m => m is "ctrl" or "shift"));
+
+        // 右 Win(0x5C) 曾经漏判：只认左 Win 时，无修饰热键会被"右Win+A"误触发，
+        // 录制时按右Win+A 也会存成 "a"（修饰键丢失）
+        Check("win 修饰键：左 Win(0x5B) 按下算按下",
+            HotkeyManager.IsModifierDown("win", vk => vk == HotkeyManager.VkLWin));
+        Check("win 修饰键：右 Win(0x5C) 按下也算按下",
+            HotkeyManager.IsModifierDown("win", vk => vk == HotkeyManager.VkRWin));
+        Check("win 修饰键：左右都没按时为假", !HotkeyManager.IsModifierDown("win", _ => false));
+        Check("修饰键：按着右 Win 时无修饰热键不触发（走统一判定）",
+            !HotkeyManager.ModifiersMatch(caps,
+                m => m == "win" && HotkeyManager.IsModifierDown("win", vk => vk == HotkeyManager.VkRWin)));
 
         var report = string.Join(Environment.NewLine, lines);
         var path = Path.Combine(CrashReporter.ReportDir, "selftest.txt");

@@ -12,6 +12,7 @@ public sealed class HotkeySpec
     public List<string> Modifiers = new(); // ctrl / shift / alt / win
     public string MainKey = "";            // 主键名称
     public string MouseButton = "";        // x1 / x2
+    public uint MainVk;                    // 预解析的主键 VK 码（0 = 无效）；避免钩子回调里每次按键都重查表
 }
 
 /// <summary>
@@ -49,54 +50,103 @@ public sealed class HotkeyManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// 启动钩子线程。整个检查-设置放在 _lock 内（原来非原子：两个线程同时进来会装两套钩子 → 热键双触发）；
+    /// 并且拒绝在上一个线程还活着时再装一套。
+    /// </summary>
     public void Start()
     {
-        if (_running) return;
-        _running = true;
-        Logger.WriteDiagnostic("[dbg] HotkeyManager.Start: 启动钩子线程");
-        _hookThread = new Thread(HookThreadMain) { IsBackground = true, Name = "hook-thread" };
-        _hookThread.SetApartmentState(ApartmentState.STA);
-        _hookThread.Start();
+        lock (_lock)
+        {
+            if (_running) return;
+            if (_hookThread is { IsAlive: true })
+            {
+                Logger.Log("上一个钩子线程尚未退出，拒绝重复安装钩子");
+                return;
+            }
+            _running = true;
+            Logger.WriteDiagnostic("[dbg] HotkeyManager.Start: 启动钩子线程");
+            _hookThread = new Thread(HookThreadMain) { IsBackground = true, Name = "hook-thread" };
+            _hookThread.SetApartmentState(ApartmentState.STA);
+            _hookThread.Start();
+        }
     }
 
+    /// <summary>
+    /// 停止钩子线程。Join 必须放在锁外（否则会阻塞钩子回调里的规则匹配）；
+    /// 超时后**绝不能把 _hookThread 置 null** —— 旧线程还活着并持有钩子句柄，
+    /// 置 null 会让 Start() 再装一套钩子（热键双触发），而旧线程退出时还会把自己字段里的句柄
+    /// Unhook 掉（那可能已经属于新线程）。
+    /// </summary>
     public void Stop()
     {
-        _running = false;
-        var t = _hookThread;
+        Thread? t;
+        lock (_lock)
+        {
+            _running = false;
+            t = _hookThread;
+        }
         if (t is { IsAlive: true })
         {
             // 钩子线程阻塞在 GetMessageW 上，必须投递 WM_QUIT 唤醒它，
             // 否则 Join 必然超时、UnhookWindowsHookEx 永远执行不到（钩子残留到进程结束）
             NativeMethods.PostThreadMessageW((uint)t.ManagedThreadId, NativeMethods.WM_QUIT, IntPtr.Zero, IntPtr.Zero);
-            t.Join(1000);
+            if (!t.Join(1000) && !t.Join(3000))
+                Logger.Log("钩子线程未在 4 秒内退出，保留线程引用（不会重复安装钩子），钩子将由进程结束回收");
         }
-        _hookThread = null;
+        if (t == null || !t.IsAlive)
+        {
+            lock (_lock)
+            {
+                _hookThread = null;
+                _keyHook = IntPtr.Zero;
+                _mouseHook = IntPtr.Zero;
+            }
+        }
     }
 
     private void HookThreadMain()
     {
-        _keyProc = KeyboardProc;
-        _mouseProc = MouseProc;
-        _keyHook = NativeMethods.SetWindowsHookEx(
-            NativeMethods.WH_KEYBOARD_LL, _keyProc, NativeMethods.GetModuleHandle(null), 0);
-        _mouseHook = NativeMethods.SetWindowsHookEx(
-            NativeMethods.WH_MOUSE_LL, _mouseProc, NativeMethods.GetModuleHandle(null), 0);
-        Logger.WriteDiagnostic($"[dbg] 钩子安装: 键盘=0x{_keyHook.ToInt64():X}, 鼠标=0x{_mouseHook.ToInt64():X}");
-
-        // 钩子回调由本线程的消息循环驱动
-        while (_running)
+        // 整个线程主体包一层：SetWindowsHookEx 失败、GetMessageW 返回 -1、Unhook 抛异常
+        // 都会终结这个线程 —— 没有 catch 的话线程直接死掉，而"钩子没装上"此前只有一行 dbg 日志
+        try
         {
-            if (!NativeMethods.GetMessageW(out var msg, IntPtr.Zero, 0, 0))
-                break;
-            NativeMethods.TranslateMessage(ref msg);
-            NativeMethods.DispatchMessage(ref msg);
-        }
+            _keyProc = KeyboardProc;
+            _mouseProc = MouseProc;
+            _keyHook = NativeMethods.SetWindowsHookEx(
+                NativeMethods.WH_KEYBOARD_LL, _keyProc, NativeMethods.GetModuleHandle(null), 0);
+            _mouseHook = NativeMethods.SetWindowsHookEx(
+                NativeMethods.WH_MOUSE_LL, _mouseProc, NativeMethods.GetModuleHandle(null), 0);
+            Logger.WriteDiagnostic($"[dbg] 钩子安装: 键盘=0x{_keyHook.ToInt64():X}, 鼠标=0x{_mouseHook.ToInt64():X}");
+            if (_keyHook == IntPtr.Zero)
+                Logger.Log("键盘钩子安装失败，热键不会生效（通常是权限不足，需要以管理员身份运行）");
+            if (_mouseHook == IntPtr.Zero)
+                Logger.Log("鼠标钩子安装失败，鼠标侧键热键不会生效");
 
-        if (_keyHook != IntPtr.Zero) NativeMethods.UnhookWindowsHookEx(_keyHook);
-        if (_mouseHook != IntPtr.Zero) NativeMethods.UnhookWindowsHookEx(_mouseHook);
-        _keyHook = IntPtr.Zero;
-        _mouseHook = IntPtr.Zero;
+            // 钩子回调由本线程的消息循环驱动
+            while (_running)
+            {
+                if (!NativeMethods.GetMessageW(out var msg, IntPtr.Zero, 0, 0))
+                    break;
+                NativeMethods.TranslateMessage(ref msg);
+                NativeMethods.DispatchMessage(ref msg);
+            }
+
+            if (_keyHook != IntPtr.Zero) NativeMethods.UnhookWindowsHookEx(_keyHook);
+            if (_mouseHook != IntPtr.Zero) NativeMethods.UnhookWindowsHookEx(_mouseHook);
+            _keyHook = IntPtr.Zero;
+            _mouseHook = IntPtr.Zero;
+        }
+        catch (Exception e)
+        {
+            Logger.Log($"钩子线程异常退出: {e.Message}");
+        }
     }
+
+    // 左右 Win 键：名称表与 ModDown 判定必须共用这一组常量 ——
+    // 0x5B 曾散落在三处，改一处漏两处就是"录制出来能存、匹配不到"的静默失效
+    public const uint VkLWin = 0x5B;
+    public const uint VkRWin = 0x5C;
 
     private static readonly Dictionary<uint, string> VkName = new()
     {
@@ -104,7 +154,7 @@ public sealed class HotkeyManager : IDisposable
         [0x14] = "caps lock", [0x1B] = "esc", [0x20] = "space", [0x21] = "page up",
         [0x22] = "page down", [0x23] = "end", [0x24] = "home", [0x25] = "left",
         [0x26] = "up", [0x27] = "right", [0x28] = "down", [0x2C] = "print screen",
-        [0x2D] = "insert", [0x2E] = "delete", [0x5B] = "win", [0x5D] = "menu",
+        [0x2D] = "insert", [0x2E] = "delete", [VkLWin] = "win", [0x5D] = "menu",
         [0x90] = "num lock",
         // 数字小键盘
         [0x60] = "num 0", [0x61] = "num 1", [0x62] = "num 2", [0x63] = "num 3",
@@ -130,7 +180,7 @@ public sealed class HotkeyManager : IDisposable
         ["caps lock"] = 0x14, ["esc"] = 0x1B, ["space"] = 0x20, ["page up"] = 0x21,
         ["page down"] = 0x22, ["end"] = 0x23, ["home"] = 0x24, ["left"] = 0x25,
         ["up"] = 0x26, ["right"] = 0x27, ["down"] = 0x28, ["print screen"] = 0x2C,
-        ["insert"] = 0x2D, ["delete"] = 0x2E, ["win"] = 0x5B, ["menu"] = 0x5D,
+        ["insert"] = 0x2D, ["delete"] = 0x2E, ["win"] = VkLWin, ["menu"] = 0x5D,
         ["num lock"] = 0x90,
         // 数字小键盘
         ["num 0"] = 0x60, ["num 1"] = 0x61, ["num 2"] = 0x62, ["num 3"] = 0x63,
@@ -155,17 +205,32 @@ public sealed class HotkeyManager : IDisposable
 
     private static readonly string[] ModifierNames = { "ctrl", "shift", "alt", "win" };
 
-    private static uint ModVk(string m) => m switch
-    {
-        "ctrl" => 0x11, "shift" => 0x10, "alt" => 0x12, "win" => 0x5B, _ => 0,
-    };
-
     private static bool ModDown(uint vk) => NativeMethods.GetAsyncKeyState((int)vk) < 0;
+
+    /// <summary>
+    /// 某个修饰键当前是否按下。**Win 键必须同时认左(0x5B)与右(0x5C)** ——
+    /// 只认左键时，"无修饰键的热键 a"会被"右Win+A"误触发（修饰键精确匹配形同虚设），
+    /// 录制时按右Win+A 也会被存成 "a"（修饰键丢失），之后单按 a 就触发。
+    /// isDown 作为参数注入，便于 --selftest 脱离真实键盘状态验证本逻辑。
+    /// </summary>
+    public static bool IsModifierDown(string m) => IsModifierDown(m, ModDown);
+
+    /// <summary>
+    /// 同上，但按键状态由外部注入 —— 便于 --selftest 脱离真实键盘验证。
+    /// 右 Win(0x5C) 曾经漏判（只认 0x5B），这条重载就是那次修复的回归保护。
+    /// </summary>
+    public static bool IsModifierDown(string m, Func<uint, bool> keyDown) => m switch
+    {
+        "ctrl" => keyDown(0x11),
+        "shift" => keyDown(0x10),
+        "alt" => keyDown(0x12),
+        "win" => keyDown(VkLWin) || keyDown(VkRWin),
+        _ => false,
+    };
 
     /// <summary>
     /// 修饰键是否与规格完全一致：要求的都按下，且没有多余修饰键按下。
     /// 缺这条判定时，把 Caps Lock 设为热键后按 Ctrl+CapsLock / Shift+CapsLock 也会误触发切换。
-    /// isDown 作为参数注入，便于 --selftest 脱离真实键盘状态验证本逻辑。
     /// </summary>
     public static bool ModifiersMatch(HotkeySpec spec, Func<string, bool> isDown)
     {
@@ -205,6 +270,7 @@ public sealed class HotkeyManager : IDisposable
             if (Array.IndexOf(ModifierNames, m) >= 0)
                 spec.Modifiers.Add(m);
         }
+        spec.MainVk = NameToVk(spec.MainKey); // 一次算好，钩子回调里只做整数比较
         return spec;
     }
 
@@ -265,10 +331,10 @@ public sealed class HotkeyManager : IDisposable
             foreach (var (spec, cb) in _rules)
             {
                 if (spec.Type != HotkeySpec.TypeKeyboard) continue;
-                // 用 VK 码比较，兼容任意名称格式（"num +"、"vk107"、"enter" 等）
-                var specVk = NameToVk(spec.MainKey);
+                // 用预解析好的 VK 码比较（ParseHotkey 时算过一次），兼容任意名称格式
+                var specVk = spec.MainVk;
                 if (specVk == 0 || specVk != vk) continue;
-                if (ModifiersMatch(spec, m => ModDown(ModVk(m)))) { hit = (spec, cb); break; }
+                if (ModifiersMatch(spec, m => IsModifierDown(m))) { hit = (spec, cb); break; }
             }
         }
         if (hit != null)
@@ -362,17 +428,19 @@ public sealed class HotkeyManager : IDisposable
             return;
         }
 
-        // 组合当前按下的修饰键
+        // 组合当前按下的修饰键（走统一判定，左右 Win 都算）
         var mods = new List<string>();
-        if (ModDown(0x11)) mods.Add("ctrl");
-        if (ModDown(0x10)) mods.Add("shift");
-        if (ModDown(0x12)) mods.Add("alt");
-        if (ModDown(0x5B)) mods.Add("win");
+        foreach (var m in ModifierNames)
+        {
+            if (IsModifierDown(m)) mods.Add(m);
+        }
 
         var hotkey = mods.Count > 0 ? string.Join("+", mods) + "+" + name : name;
         _recording = false;
         var recorded = _onRecorded;
         _onRecorded = null;
+        _onCancel = null; // 与 esc 分支对称：成功出口也必须清掉取消回调，
+                          // 否则"按 ESC 取消 → 重新录制 → 再按 ESC"会用上一次遗留的 onCancel 取消掉新录制
         if (recorded != null) Task.Run(() => recorded(hotkey));
     }
 

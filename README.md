@@ -36,7 +36,7 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
 
 ## 下载
 
-当前版本 `1.3.0`。访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
+当前版本 `1.4.0`。访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
 
 ## 使用说明
 
@@ -64,7 +64,7 @@ dotnet publish -c Release -r win-x64 --self-contained true
 
 ### 热键逻辑自检
 
-改过热键解析/比较逻辑后，可跑内置自检（20 条断言，不开窗口、不装钩子，结果写入 `selftest.txt`，退出码 = 失败条数）：
+改过热键解析/比较逻辑后，可跑内置自检（24 条断言，不开窗口、不装钩子，结果写入 `selftest.txt`，退出码 = 失败条数）：
 
 ```bash
 IME_Switcher.exe --selftest

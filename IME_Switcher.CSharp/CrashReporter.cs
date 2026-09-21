@@ -43,8 +43,11 @@ public static class CrashReporter
         sb.AppendLine(new string('-', 60));
         sb.AppendLine($"日志写盘失败次数: {Logger.WriteFailures}"
             + (Logger.LastWriteError is null ? "" : $"（最近错误: {Logger.LastWriteError}）"));
+        sb.AppendLine($"日志丢弃条数（队列满）: {Logger.DroppedCount}");
         sb.AppendLine("最近日志:");
-        sb.AppendLine(string.Join("\n", Logger.GetRecent(80)));
+        // 用不等锁的版本：崩溃时若有线程正持日志锁（日志线程卡在磁盘 I/O 很常见），
+        // 在这里死等会让报告永远写不出来 —— 宁可少几行日志，也要保证报告能生成
+        sb.AppendLine(string.Join("\n", Logger.GetRecentNoWait(80)));
         try
         {
             Directory.CreateDirectory(ReportDir);
@@ -53,7 +56,11 @@ public static class CrashReporter
             BackupRunLog(); // 完整运行日志转存为崩溃日志
             Logger.WriteDiagnostic($"[crash] {kind} -> 崩溃报告: {path}");
         }
-        catch { }
+        catch (Exception e)
+        {
+            // 报告写不出来时必须留痕，否则用户看到的就是"没有报告文件"、无从查起
+            Logger.NoteWriteFailure($"崩溃报告写入失败: {e.Message}");
+        }
     }
 
     /// <summary>
@@ -65,12 +72,15 @@ public static class CrashReporter
     {
         try
         {
-            var all = Logger.GetAll();
+            var all = Logger.GetAllNoWait();
             if (all.Length == 0) return;
             Directory.CreateDirectory(ReportDir);
             var logPath = Path.Combine(ReportDir, $"crash_run_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             File.WriteAllLines(logPath, all);
         }
-        catch { }
+        catch (Exception e)
+        {
+            Logger.NoteWriteFailure($"崩溃日志转存失败: {e.Message}");
+        }
     }
 }

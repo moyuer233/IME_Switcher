@@ -254,6 +254,11 @@ internal static partial class NativeMethods
     }
     public const uint TME_LEAVE = 0x2;
 
+    /// <summary>
+    /// 托盘图标数据。**只支持 uID 版本**（NOTIFYICON_VERSION_4 之前的形态）：
+    /// cbSize 用 Marshal.SizeOf 一次算好，且故意不填 szInfo / guidItem。
+    /// 以后若要加气泡提示（NIF_INFO）或用 GUID 识别图标，必须先按 uVersion 选 cbSize，否则会静默无效。
+    /// </summary>
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct NOTIFYICONDATAW
     {

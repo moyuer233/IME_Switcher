@@ -47,8 +47,14 @@ public static class NativeCrashFilter
                 sb.AppendLine($"  frame[{i}] 0x{frames[i].ToInt64():X}");
             WriteRaw(sb.ToString());
         }
-        catch { }
-        return 0; // 交给系统默认处理
+        catch (Exception e)
+        {
+            Logger.NoteWriteFailure($"原生崩溃处理异常: {e.Message}");
+        }
+        // 返回 EXCEPTION_CONTINUE_SEARCH：本过滤器只做"旁路记录"，记完把控制权交回系统，
+        // 让 WER / CLR 自己的处理流程照常走（改成 EXECUTE_HANDLER 反而会顶掉系统转储）。
+        // 注意 SetUnhandledExceptionFilter 对 fail-fast（如堆损坏）无效，那类崩溃不经过这里。
+        return 0;
     }
 
     private static void WriteRaw(string text)
@@ -58,9 +64,12 @@ public static class NativeCrashFilter
             string dir = CrashReporter.ReportDir;
             Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, $"crash_native_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
-            File.WriteAllText(path, text + "\n" + string.Join("\n", Logger.GetRecent(50)));
+            File.WriteAllText(path, text + "\n" + string.Join("\n", Logger.GetRecentNoWait(50)));
             CrashReporter.BackupRunLog(); // 完整运行日志转存为崩溃日志
         }
-        catch { }
+        catch (Exception e)
+        {
+            Logger.NoteWriteFailure($"原生崩溃日志写入失败: {e.Message}");
+        }
     }
 }

@@ -7,7 +7,8 @@ namespace IMESwitcher;
 internal sealed class TrayIcon : IDisposable
 {
     private IntPtr _hwnd;
-    private IntPtr _hicon;
+    private IntPtr _hicon;  // 自绘图标句柄（GetHicon 创建，需要自己 DestroyIcon）
+    private Icon? _appIcon; // exe 内嵌图标对象（句柄随 Icon 释放）
     private bool _added;
 
     /// <summary>托盘图标是否真的加上了；false 时调用方必须禁止隐藏窗口，否则没有任务栏也没有托盘入口，用户无法唤出/退出</summary>
@@ -16,6 +17,7 @@ internal sealed class TrayIcon : IDisposable
     public bool Add(IntPtr hwnd)
     {
         _hwnd = hwnd;
+        ReleaseIcon(); // 重复 Add（托盘重建）时先释放上一次的图标，否则图标句柄泄漏
         _hicon = CreateIcon();
         var data = BuildData();
         _added = NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_ADD, ref data);
@@ -32,14 +34,20 @@ internal sealed class TrayIcon : IDisposable
             NativeMethods.Shell_NotifyIconW(NativeMethods.NIM_DELETE, ref data);
             _added = false;
         }
+        ReleaseIcon();
+    }
+
+    /// <summary>图标句柄只有两条来源，统一在这里释放：内嵌图标交给 Icon 对象，自绘图标自己 DestroyIcon</summary>
+    private void ReleaseIcon()
+    {
         if (_appIcon != null)
         {
-            _appIcon.Dispose(); // 内嵌图标：句柄由 Icon 对象释放
+            _appIcon.Dispose();
             _appIcon = null;
         }
         else if (_hicon != IntPtr.Zero)
         {
-            NativeMethods.DestroyIcon(_hicon); // 兜底自绘图标：GetHicon 创建的句柄必须自己销毁
+            NativeMethods.DestroyIcon(_hicon);
         }
         _hicon = IntPtr.Zero;
     }
@@ -59,9 +67,7 @@ internal sealed class TrayIcon : IDisposable
         return nid;
     }
 
-    private static Icon? _appIcon;
-
-    private static IntPtr CreateIcon()
+    private IntPtr CreateIcon()
     {
         // 优先使用 exe 内嵌图标（icon.ico）
         try

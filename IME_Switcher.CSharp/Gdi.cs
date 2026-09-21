@@ -104,19 +104,6 @@ internal static class Gdi
             g.FillRectangle(br, l + half, t, r - l - half, b - t);
     }
 
-    /// <summary>
-    /// 平滑圆点（GDI+ 抗锯齿）。GDI 的 <c>Ellipse</c> 是硬边绘制、没有抗锯齿，
-    /// 18px 的圆点放在平滑的圆角轨道上会露出明显锯齿 —— 圆点必须走这里。
-    /// 坐标为浮点：量化成整数会让滑块动画一跳一跳。
-    /// </summary>
-    public static void FillEllipse(IntPtr hdc, float cx, float cy, float radius, Color color)
-    {
-        using var g = Graphics.FromHdc(hdc);
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var brush = new SolidBrush(color);
-        g.FillEllipse(brush, cx - radius, cy - radius, radius * 2, radius * 2);
-    }
-
     private static GraphicsPath RoundedRectPath(int l, int t, int r, int b, int radius)
     {
         var path = new GraphicsPath();
