@@ -27,7 +27,7 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
 - 自定义热键：支持键盘按键（含数字小键盘）与鼠标侧键（X1/X2），点击界面录制热键，按 `ESC` 取消
 - 鼠标侧键：X1 / X2 侧键可直接作为切换或开关热键
 - 两种切换方式：API 模式用 `LoadKeyboardLayout` + `PostMessage(WM_INPUTLANGCHANGEREQUEST)`，自动验证并回退模拟；模拟模式模拟 `Win+Space`，兼容性最强
-- 简约界面：纯 Win32 自绘（无 WinForms/WPF），DirectWrite 文字渲染，GDI+ 平滑圆角，思源黑体 + 微软雅黑，圆角窗口 + 滑块动画
+- 简约界面：纯 Win32 自绘（无 WinForms/WPF），GDI ClearType 文字渲染 + GDI+ 平滑圆角，圆角窗口 + 滑块动画
 - 系统托盘：支持最小化到托盘、默认启动到托盘、托盘右键菜单（显示设置/启动/停止/退出）
 - 独立日志窗口：调试日志独立窗口显示，不遮挡主界面，支持滚动与「手动切换」
 - 运行日志：应用目录持续写入 `run.log`，每次启动自动清理；崩溃时自动转存为 `crash_run_*.log` 并生成崩溃报告
@@ -36,7 +36,7 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
 
 ## 下载
 
-当前版本 `1.2.0`。访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
+当前版本 `1.3.0`。访问 [Releases](https://github.com/moyuer233/IME_Switcher/releases) 下载 `IME_Switcher.exe`，以管理员身份运行（程序会自动请求权限，全局热键钩子需要管理员权限）。
 
 ## 使用说明
 
@@ -60,7 +60,7 @@ dotnet publish -c Release -r win-x64 --self-contained true
 
 产物位于 `IME_Switcher.CSharp/bin/Release/net9.0-windows/win-x64/publish/IME_Switcher.exe`（约 3MB）。
 
-字体：卡片标题使用思源黑体（Source Han Sans SC），该字体不是 Windows 自带字体；未安装时会自动回退到微软雅黑，界面依旧可用。
+字体：界面文字优先使用系统已安装的 Noto Sans SC，缺失时依次回退 HarmonyOS Sans SC 与微软雅黑，任何 Windows 上都能正常显示。
 
 ### 热键逻辑自检
 
@@ -73,7 +73,7 @@ IME_Switcher.exe --selftest
 ## 技术栈
 
 - C# / .NET 9 NativeAOT（自包含单文件，体积 5MB 以内）
-- 纯 Win32 API（GDI / GDI+ / DirectWrite / D2D / DWM）自绘界面
+- 纯 Win32 API（GDI / GDI+ / D2D / DWM）自绘界面，文字走 GDI ClearType 渲染
 - 全局低层钩子（`WH_KEYBOARD_LL` / `WH_MOUSE_LL`）实现热键监听
 
 ## 旧版说明
@@ -102,3 +102,5 @@ A：程序所在目录下的 `run.log`（每次启动自动清空，因此该目
 如果觉得好用，请给个 Star 支持一下，欢迎提交 Issue 和 Pull Request。
 
 PS：感谢蓝色大肥鱼的辛苦工作，写这玩意最初是因为键盘老是卡键，用 ae 搜效果时要频繁切换输入法特别烦人，然后去 GitHub 上找了一堆软件自己用的都不顺手，还是自己写一个好。
+
+界面配色与尺寸规范参考了 [Plain Craft Launcher](https://github.com/Meloong-Git/PCL)（作者 龙腾猫跃），仅参考设计参数，无代码派生。

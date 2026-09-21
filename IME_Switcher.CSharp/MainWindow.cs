@@ -11,7 +11,8 @@ namespace IMESwitcher;
 internal sealed class MainWindow
 {
     public const int W = 560;
-    public const int H = 500; // 内容到 y=478 结束：原 660 会在底部留 182px 空白
+    public const int H = 524;
+    public const int TitleH = 48; // PCL 标题栏高度（固定值，不要改成 44/52）
     public const string ClassName = "IMESwitcherMain"; // 单实例激活按类名查找（比按窗口标题可靠，标题只是界面文案）
     public const uint WM_REFRESH = NativeMethods.WM_USER + 2;
 
@@ -343,26 +344,66 @@ internal sealed class MainWindow
 
     private const int ContentLeft = 20;
     private const int ContentW = 520;
+    private const int Gap = 15; // PCL 卡片间距
+    private const int Pad = 25; // PCL 卡片内容左右内边距
+
+    // 纵向骨架：整页的位置全部由这几个常量推导，改标题栏或卡片高度时文字与控件一起走
+    private const int StatusTop = TitleH + 8;
+    private const int StatusH = 24;
+    private const int Card1Top = StatusTop + StatusH + Gap;
+    private const int Card1H = 190;
+    private const int Card2Top = Card1Top + Card1H + Gap;
+    private const int Card2H = 154;
+    private const int ActionsTop = Card2Top + Card2H + Gap;
+    private const int ActionsH = 35; // PCL 按钮高度
+
+    // 卡内几何（PCL：卡片标题偏移 (15,12)，内容上内边距 40）
+    private const int DyTitle = 12;
+    private const int DyContent = 40;
+    private const int RowH = 35;    // 一行的高度（输入框 / 按钮）
+    private const int RowGap = 10;  // 行间距
+    private const int SwitchH = 24;
+    private const int DyRow1 = DyContent;
+    private const int DyRow2 = DyRow1 + RowH + RowGap;
+    private const int DyHint = DyRow2 + RowH + RowGap;
+    private const int DyNotice = DyHint + 24;
+    private const int DySwitch2 = DyRow2 + SwitchH + 6;
 
     private static NativeMethods.RECT R(int l, int t, int w, int h)
         => new() { left = l, top = t, right = l + w, bottom = t + h };
 
-    private static readonly NativeMethods.RECT RTitleMin = R(W - 92, 0, 46, 48);
-    private static readonly NativeMethods.RECT RTitleClose = R(W - 46, 0, 46, 48);
-    private static readonly NativeMethods.RECT RHotkeyCard = R(ContentLeft, 92, ContentW, 180);
-    private static readonly NativeMethods.RECT ROptionsCard = R(ContentLeft, 282, ContentW, 150);
-    private static readonly NativeMethods.RECT RHotkeyField = R(110, 136, 316, 30);
-    private static readonly NativeMethods.RECT RToggleField = R(110, 178, 316, 30);
-    private static readonly NativeMethods.RECT RBtnChange1 = R(436, 136, 80, 30);
-    private static readonly NativeMethods.RECT RBtnChange2 = R(436, 178, 80, 30);
-    private static readonly NativeMethods.RECT RSegApi = R(110, 324, 175, 30);
-    private static readonly NativeMethods.RECT RSegSim = R(285, 324, 175, 30);
-    private static readonly NativeMethods.RECT RChkAuto = R(36, 368, 478, 26);
-    private static readonly NativeMethods.RECT RChkTray = R(36, 396, 478, 26);
-    private static readonly NativeMethods.RECT RBtnStart = R(20, 444, 116, 34);
-    private static readonly NativeMethods.RECT RBtnStop = R(148, 444, 116, 34);
-    private static readonly NativeMethods.RECT RBtnDebug = R(276, 444, 116, 34);
-    private const int SwitchLeft = 470; // 开关滑块的左边界（垂直位置直接复用对应命中区的 top）
+    // 卡片内的列：标签 / 值 / 行内按钮
+    private const int RowLeft = ContentLeft + Pad;             // 45
+    private const int RowRight = ContentLeft + ContentW - Pad; // 515
+    private const int LabelW = 83;
+    private const int RowBtnW = 75;
+    private static readonly int RowFieldLeft = RowLeft + LabelW;
+    private static readonly int RowBtnLeft = RowRight - RowBtnW;
+    private static readonly int RowFieldW = RowBtnLeft - RowGap - RowFieldLeft;
+
+    private static readonly NativeMethods.RECT RTitleMin = R(W - 88, 0, 44, TitleH);
+    private static readonly NativeMethods.RECT RTitleClose = R(W - 44, 0, 44, TitleH);
+    private static readonly NativeMethods.RECT RHotkeyCard = R(ContentLeft, Card1Top, ContentW, Card1H);
+    private static readonly NativeMethods.RECT ROptionsCard = R(ContentLeft, Card2Top, ContentW, Card2H);
+    private static readonly NativeMethods.RECT RHotkeyField = R(RowFieldLeft, Card1Top + DyRow1, RowFieldW, RowH);
+    private static readonly NativeMethods.RECT RToggleField = R(RowFieldLeft, Card1Top + DyRow2, RowFieldW, RowH);
+    private static readonly NativeMethods.RECT RBtnChange1 = R(RowBtnLeft, Card1Top + DyRow1, RowBtnW, RowH);
+    private static readonly NativeMethods.RECT RBtnChange2 = R(RowBtnLeft, Card1Top + DyRow2, RowBtnW, RowH);
+    // 分段胶囊（PCL MyRadioButton：高 27、全圆角）
+    private static readonly int SegY = Card2Top + DyRow1 + 4;
+    private static readonly int SegW = RowRight - RowFieldLeft;
+    private static readonly NativeMethods.RECT RSegApi = R(RowFieldLeft, SegY, SegW / 2, 27);
+    private static readonly NativeMethods.RECT RSegSim = R(RowFieldLeft + SegW / 2, SegY, SegW - SegW / 2, 27);
+    private static readonly NativeMethods.RECT RChkAuto = R(RowLeft, Card2Top + DyRow2, RowRight - RowLeft, SwitchH);
+    private static readonly NativeMethods.RECT RChkTray = R(RowLeft, Card2Top + DySwitch2, RowRight - RowLeft, SwitchH);
+    // 底部三按钮：等宽居中
+    private const int BtnW = 116;
+    private const int BtnH = ActionsH;
+    private const int BtnGap = RowGap;
+    private static readonly int BtnLeft = ContentLeft + (ContentW - (BtnW * 3 + BtnGap * 2)) / 2;
+    private static readonly NativeMethods.RECT RBtnStart = R(BtnLeft, ActionsTop, BtnW, BtnH);
+    private static readonly NativeMethods.RECT RBtnStop = R(BtnLeft + BtnW + BtnGap, ActionsTop, BtnW, BtnH);
+    private static readonly NativeMethods.RECT RBtnDebug = R(BtnLeft + (BtnW + BtnGap) * 2, ActionsTop, BtnW, BtnH);
 
     // ---------------- 命中测试 ----------------
 
@@ -371,7 +412,7 @@ internal sealed class MainWindow
 
     private UiId HitTest(int x, int y)
     {
-        if (y < 48)
+        if (y < TitleH)
         {
             if (InRect(x, y, RTitleClose)) return UiId.BtnClose;
             if (InRect(x, y, RTitleMin)) return UiId.BtnMin;
@@ -512,10 +553,10 @@ internal sealed class MainWindow
 
     private void RenderTitleBar(IntPtr hdc)
     {
-        Gdi.Fill(hdc, 0, 0, W, 48, Theme.Card); // 白色标题栏
-        Gdi.TextLeft(hdc, "⌨", 16, 0, 32, 48, Theme.Accent, Gdi.FontSymbol);
-        Gdi.TextLeft(hdc, "输入法一键切换", 50, 0, 220, 48, Theme.Text, Gdi.FontBold);
-        Gdi.Fill(hdc, 0, 47, W, 48, Theme.BorderMuted);
+        // PCL 标题栏：水平三段蓝渐变（HSL 210/85/48 → 54 → 48），图标与标题都是白色
+        Gdi.FillGradientH(hdc, 0, 0, W, TitleH, Theme.TitleBarL, Theme.TitleBarM, Theme.TitleBarL);
+        Gdi.TextLeft(hdc, "⌨", 16, 0, 32, TitleH, Color.White, Gdi.FontSymbol);
+        Gdi.TextLeft(hdc, "输入法一键切换", 50, 0, 220, TitleH, Color.White, Gdi.FontBold);
 
         RenderTitleBtn(hdc, RTitleMin, TitleBtnType.Min, _hover == UiId.BtnMin);
         RenderTitleBtn(hdc, RTitleClose, TitleBtnType.Close, _hover == UiId.BtnClose);
@@ -523,20 +564,20 @@ internal sealed class MainWindow
 
     private enum TitleBtnType { Min, Close }
 
-    /// <summary>右上角窗口按钮：GDI+ 圆角线段图形，hover 圆角底色</summary>
+    /// <summary>标题栏按钮（PCL 风格：白色线条 + 悬停时 28×28 半透明白底；关闭键悬停转红）</summary>
     private void RenderTitleBtn(IntPtr hdc, NativeMethods.RECT r, TitleBtnType type, bool hover)
     {
+        int cx = r.left + (r.right - r.left) / 2, cy = r.top + (r.bottom - r.top) / 2;
         if (hover)
         {
-            Gdi.FillRounded(hdc, r.left + 2, r.top + 4, r.right - 2, r.bottom - 4,
-                type == TitleBtnType.Close ? Theme.Danger : Theme.BgSubtle, 6);
+            Gdi.FillRounded(hdc, cx - 14, cy - 14, cx + 14, cy + 14,
+                type == TitleBtnType.Close ? Theme.Danger : Color.FromArgb(0x50, 255, 255, 255), 4);
         }
         using var g = Graphics.FromHdc(hdc);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var pen = new Pen(hover && type == TitleBtnType.Close ? Color.White : Theme.TextMuted, 1.6f);
+        using var pen = new Pen(Color.White, 1.4f);
         pen.StartCap = LineCap.Round;
         pen.EndCap = LineCap.Round;
-        int cx = r.left + (r.right - r.left) / 2, cy = r.top + (r.bottom - r.top) / 2;
         if (type == TitleBtnType.Min)
         {
             // 最小化：水平短线
@@ -552,145 +593,163 @@ internal sealed class MainWindow
 
     private void RenderStatus(IntPtr hdc)
     {
-        // PCL 风格状态徽章（胶囊），与右侧文字垂直居中对齐（中心 y≈74）
+        // 状态徽章（PCL 提示条配色：绿底绿字 / 灰底灰字），圆角与按钮一致
         string label = Listening ? "运行中" : "已停止";
-        var bg = Listening ? Color.FromArgb(0xE6, 0xF4, 0xEA) : Theme.BgSubtle;
-        var fg = Listening ? Theme.Success : Theme.TextMuted;
-        Gdi.FillRounded(hdc, 24, 63, 90, 85, bg, 11);
-        Gdi.TextCentered(hdc, label, 24, 64, 66, 21, fg, Gdi.FontSmall);
+        var bg = Listening ? Theme.SuccessSoftBg : Theme.BgSubtle;
+        var fg = Listening ? Theme.Success : Theme.TextFaint;
+        Gdi.FillRounded(hdc, ContentLeft, StatusTop, ContentLeft + 66, StatusTop + StatusH, bg, Theme.RadiusBtn);
+        Gdi.TextCentered(hdc, label, ContentLeft, StatusTop, 66, StatusH, fg, Gdi.FontSmall);
 
         string status = Listening
             ? $"监听中 ({HotkeyText}{(string.IsNullOrEmpty(ToggleText) || ToggleText == "未设置" ? "" : " · 开关 " + ToggleText)})"
             : "未启动";
-        Gdi.TextLeft(hdc, status, 102, 64, 420, 21, Theme.TextMuted, Gdi.FontSmall);
+        Gdi.TextLeft(hdc, status, ContentLeft + 78, StatusTop, 424, StatusH, Theme.TextMuted, Gdi.FontSmall);
     }
 
     private void RenderHotkeyCard(IntPtr hdc)
     {
         var card = RHotkeyCard;
+        Gdi.Shadow(hdc, card.left, card.top, card.right, card.bottom, Theme.Radius);
         Gdi.FillRounded(hdc, card.left, card.top, card.right, card.bottom, Theme.Card, Theme.Radius);
-        Gdi.DrawBorder(hdc, card, Theme.Border, Theme.Radius);
-        Gdi.TextLeft(hdc, "热键设置", 36, 102, 200, 24, Theme.Text, Gdi.FontCard);
+        // PCL 卡片标题：相对卡片偏移 (15, 12)
+        Gdi.TextLeft(hdc, "热键设置", card.left + 15, Card1Top + DyTitle, 200, 22, Theme.Text, Gdi.FontCard);
 
-        // 切换热键
-        Gdi.TextLeft(hdc, "切换热键", 36, 136, 70, 30, Theme.TextMuted, Gdi.FontSmall);
+        // 切换热键（标签与字段同高居中：共用同一行的矩形）
+        Gdi.TextLeft(hdc, "切换热键", RowLeft, RHotkeyField.top, LabelW, RowH, Theme.TextMuted, Gdi.FontSmall);
         var recording = RecordingTarget == "hotkey";
         RenderField(hdc, RHotkeyField, recording ? "按下热键... (ESC 取消)" : HotkeyText, recording);
-        RenderButton(hdc, RBtnChange1, "更改", GitHubBtn.Secondary, _hover == UiId.BtnChange1, _pressed == UiId.BtnChange1, true);
+        RenderButton(hdc, RBtnChange1, "更改", BtnKind.Normal, _hover == UiId.BtnChange1, _pressed == UiId.BtnChange1, true);
 
         // 开关热键
-        Gdi.TextLeft(hdc, "开关热键", 36, 178, 70, 30, Theme.TextMuted, Gdi.FontSmall);
+        Gdi.TextLeft(hdc, "开关热键", RowLeft, RToggleField.top, LabelW, RowH, Theme.TextMuted, Gdi.FontSmall);
         var recording2 = RecordingTarget == "toggle";
         RenderField(hdc, RToggleField, recording2 ? "按下热键... (ESC 取消)" : ToggleText, recording2);
         if (RecordingTarget == "toggle")
-            RenderButton(hdc, RBtnChange2, "取消", GitHubBtn.Secondary, _hover == UiId.BtnCancel, _pressed == UiId.BtnCancel, true);
+            RenderButton(hdc, RBtnChange2, "取消", BtnKind.Normal, _hover == UiId.BtnCancel, _pressed == UiId.BtnCancel, true);
         else
-            RenderButton(hdc, RBtnChange2, "更改", GitHubBtn.Secondary, _hover == UiId.BtnChange2, _pressed == UiId.BtnChange2, true);
+            RenderButton(hdc, RBtnChange2, "更改", BtnKind.Normal, _hover == UiId.BtnChange2, _pressed == UiId.BtnChange2, true);
 
         Gdi.TextLeft(hdc, "点击热键框或「更改」后按下键盘按键 / 鼠标侧键（X1/X2），按 ESC 取消",
-            36, 222, 480, 20, Theme.TextMuted, Gdi.FontSmall);
+            RowLeft, Card1Top + DyHint, RowRight - RowLeft, 22, Theme.TextMuted, Gdi.FontSmall);
 
         if (!string.IsNullOrEmpty(Notice))
-            Gdi.TextLeft(hdc, Notice, 36, 244, 480, 20, Theme.Danger, Gdi.FontBold);
+            Gdi.TextLeft(hdc, Notice, RowLeft, Card1Top + DyNotice, RowRight - RowLeft, 22, Theme.Danger, Gdi.FontBold);
     }
 
     private void RenderField(IntPtr hdc, NativeMethods.RECT r, string text, bool recording)
     {
-        if (recording)
-            Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom, Color.FromArgb(0xFF, 0xF8, 0xC5), Theme.Radius);
-        else
-            Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom, Theme.Card, Theme.Radius);
-        Gdi.DrawBorder(hdc, r, Theme.Border, Theme.Radius);
-        Gdi.Text(hdc, text, new NativeMethods.RECT { left = r.left, top = r.top, right = r.right, bottom = r.bottom },
-            Theme.Text, Gdi.FontBold, NativeMethods.DT_CENTER | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE);
+        // PCL 输入框：白底 + 1px 灰描边 + 圆角 3
+        Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom,
+            recording ? Color.FromArgb(0xFF, 0xF8, 0xC5) : Theme.FieldBg, Theme.RadiusBtn);
+        Gdi.DrawBorder(hdc, r, recording ? Color.FromArgb(0xF0, 0xD9, 0x8A) : Theme.BorderInput, Theme.RadiusBtn);
+        // 值左对齐、常规字重：居中加粗会看起来像标题而不像"可编辑的内容"
+        var inner = new NativeMethods.RECT { left = r.left + 10, top = r.top, right = r.right - 8, bottom = r.bottom };
+        Gdi.Text(hdc, text, inner, Theme.Text,
+            recording ? Gdi.FontBold : Gdi.FontNormal,
+            NativeMethods.DT_LEFT | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE);
     }
 
     private void RenderOptionsCard(IntPtr hdc)
     {
         var card = ROptionsCard;
+        Gdi.Shadow(hdc, card.left, card.top, card.right, card.bottom, Theme.Radius);
         Gdi.FillRounded(hdc, card.left, card.top, card.right, card.bottom, Theme.Card, Theme.Radius);
-        Gdi.DrawBorder(hdc, card, Theme.Border, Theme.Radius);
-        Gdi.TextLeft(hdc, "选项", 36, 292, 200, 24, Theme.Text, Gdi.FontCard);
+        Gdi.TextLeft(hdc, "选项", card.left + 15, Card2Top + DyTitle, 200, 22, Theme.Text, Gdi.FontCard);
 
-        Gdi.TextLeft(hdc, "切换方式", 36, 326, 70, 30, Theme.TextMuted, Gdi.FontSmall);
+        Gdi.TextLeft(hdc, "切换方式", RowLeft, RSegApi.top, LabelW, 27, Theme.TextMuted, Gdi.FontSmall);
         RenderSegmented(hdc, RSegApi, RSegSim, Method);
 
-        Gdi.TextLeft(hdc, "开机自动启动", 36, 368, 200, 26, Theme.Text, Gdi.FontSmall);
-        RenderSwitch(hdc, SwitchLeft, RChkAuto.top, _animAuto, _hover == UiId.ChkAuto);
+        // PCL 的设置项排版：复选框在左、标签紧跟其后（MyCheckBox 标签左边距 26）
+        RenderCheck(hdc, RowLeft, RChkAuto.top + 3, _animAuto, _hover == UiId.ChkAuto);
+        Gdi.TextLeft(hdc, "开机自动启动", RowLeft + 26, RChkAuto.top, 200, SwitchH, Theme.Text, Gdi.FontSmall);
 
-        Gdi.TextLeft(hdc, "默认启动到托盘", 36, 396, 200, 26, Theme.Text, Gdi.FontSmall);
-        RenderSwitch(hdc, SwitchLeft, RChkTray.top, _animTray, _hover == UiId.ChkTray);
+        RenderCheck(hdc, RowLeft, RChkTray.top + 3, _animTray, _hover == UiId.ChkTray);
+        Gdi.TextLeft(hdc, "默认启动到托盘", RowLeft + 26, RChkTray.top, 200, SwitchH, Theme.Text, Gdi.FontSmall);
     }
 
-    /// <summary>PCL 风格分段选择控件（两段区域由布局常量给出，缝隙位置=两段分界）</summary>
+    /// <summary>
+    /// PCL 胶囊分段（MyRadioButton）：高 27、全圆角；
+    /// 选中＝实心蓝 + 白字，未选中＝无底色 + 蓝字（原先是浅蓝底 + 深蓝字，与 PCL 相反）。
+    /// </summary>
     private static void RenderSegmented(IntPtr hdc, NativeMethods.RECT api, NativeMethods.RECT sim, int method)
     {
-        int left = api.left, top = api.top, right = sim.right, bottom = api.bottom;
-        int mid = sim.left;
-        Gdi.FillRounded(hdc, left, top, right, bottom, Theme.BgSubtle, Theme.Radius);
-        if (method == 1)
-            Gdi.FillRounded(hdc, left, top, mid, bottom, Theme.Accent, Theme.Radius);
-        Gdi.TextCentered(hdc, "API（优先库）", left, top, mid - left, bottom - top,
-            method == 1 ? Color.White : Theme.Text, Gdi.FontBold);
-        if (method == 2)
-            Gdi.FillRounded(hdc, mid, top, right, bottom, Theme.Accent, Theme.Radius);
-        Gdi.TextCentered(hdc, "模拟（Win+Space）", mid, top, right - mid, bottom - top,
-            method == 2 ? Color.White : Theme.Text, Gdi.FontBold);
+        bool apiOn = method == 1;
+        var sel = apiOn ? api : sim;
+        Gdi.FillRounded(hdc, sel.left, sel.top, sel.right, sel.bottom, Theme.AccentHover, (sel.bottom - sel.top) / 2);
+        Gdi.TextCentered(hdc, "API（优先库）", api.left, api.top, api.right - api.left, api.bottom - api.top,
+            apiOn ? Color.White : Theme.AccentHover, apiOn ? Gdi.FontBold : Gdi.FontNormal);
+        Gdi.TextCentered(hdc, "模拟（Win+Space）", sim.left, sim.top, sim.right - sim.left, sim.bottom - sim.top,
+            apiOn ? Theme.AccentHover : Color.White, apiOn ? Gdi.FontNormal : Gdi.FontBold);
     }
 
-    /// <summary>PCL 风格开关滑块（progress 0=关 1=开，支持动画）</summary>
-    private static void RenderSwitch(IntPtr hdc, int l, int t, float progress, bool hover)
+    /// <summary>
+    /// PCL 复选框（MyCheckBox）：18×18 圆角 3 的空心方框 + 勾。
+    /// 未选中描边 #343D4A（悬停 #1370F3），选中描边 #0B5BCB；勾带回弹地弹出（PCL 用 AniEaseOutBack）。
+    /// PCL 里"开/关"就是靠它承担的 —— 全仓没有 iOS 风格滑动开关。
+    /// </summary>
+    private static void RenderCheck(IntPtr hdc, int l, int t, float progress, bool hover)
     {
-        const int trackW = 44, trackH = 24, knob = 18;
-        var trackColor = LerpColor(Theme.TrackOff, Theme.Accent, progress);
-        Gdi.FillRounded(hdc, l, t, l + trackW, t + trackH, trackColor, trackH / 2);
-        int kx = l + 3 + (int)((trackW - knob - 6) * progress);
-        int ky = t + (trackH - knob) / 2;
-        var brush = NativeMethods.CreateSolidBrush(NativeMethods.ColorToCOLORREF(Color.White));
-        var oldB = NativeMethods.SelectObject(hdc, brush);
-        var pen = NativeMethods.CreatePen((int)NativeMethods.PS_SOLID, 1,
-            NativeMethods.ColorToCOLORREF(LerpColor(Color.FromArgb(0xBF, 0xC3, 0xC7), Theme.Accent, progress)));
-        var oldP = NativeMethods.SelectObject(hdc, pen);
-        NativeMethods.Ellipse(hdc, kx, ky, kx + knob, ky + knob);
-        NativeMethods.SelectObject(hdc, oldB);
-        NativeMethods.SelectObject(hdc, oldP);
-        NativeMethods.DeleteObject(brush);
-        NativeMethods.DeleteObject(pen);
+        const int box = 18;
+        bool on = progress > 0.5f;
+        var line = hover ? Theme.AccentHover : on ? Theme.Accent : Theme.AccentInk;
+        Gdi.FillRounded(hdc, l, t, l + box, t + box, Theme.Card, Theme.RadiusBtn);
+        Gdi.DrawBorder(hdc, new NativeMethods.RECT { left = l, top = t, right = l + box, bottom = t + box },
+            line, Theme.RadiusBtn);
+        if (progress <= 0.02f) return;
+
+        using var g = Graphics.FromHdc(hdc);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        float s = EaseOutBack(progress);
+        float cx = l + box / 2f, cy = t + box / 2f;
+        PointF P(float x, float y) => new(cx + (x - 6f) * s, cy + (y - 6f) * s);
+        using var pen = new Pen(line, 1.8f)
+        {
+            StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round,
+        };
+        g.DrawLines(pen, new[] { P(2.6f, 6.4f), P(5f, 8.8f), P(9.4f, 3.6f) });
+    }
+
+    /// <summary>回弹缓动（PCL 的 AniEaseOutBack）：t 过 0.7 后略超 1 再收回，勾弹出时有个小回弹</summary>
+    private static float EaseOutBack(float t)
+    {
+        const float c1 = 1.70158f, c3 = c1 + 1f;
+        float u = t - 1f;
+        return 1f + c3 * u * u * u + c1 * u * u;
     }
 
     private void RenderActions(IntPtr hdc)
     {
-        RenderButton(hdc, RBtnStart, "启动", GitHubBtn.Primary, _hover == UiId.BtnStart, _pressed == UiId.BtnStart, !Listening);
-        RenderButton(hdc, RBtnStop, "停止", GitHubBtn.Danger, _hover == UiId.BtnStop, _pressed == UiId.BtnStop, Listening);
-        RenderButton(hdc, RBtnDebug, "调试日志", GitHubBtn.Secondary, _hover == UiId.BtnDebug, _pressed == UiId.BtnDebug, true);
+        RenderButton(hdc, RBtnStart, "启动", BtnKind.Highlight, _hover == UiId.BtnStart, _pressed == UiId.BtnStart, !Listening);
+        RenderButton(hdc, RBtnStop, "停止", BtnKind.Red, _hover == UiId.BtnStop, _pressed == UiId.BtnStop, Listening);
+        RenderButton(hdc, RBtnDebug, "调试日志", BtnKind.Normal, _hover == UiId.BtnDebug, _pressed == UiId.BtnDebug, true);
     }
 
-    private enum GitHubBtn { Primary, Danger, Secondary }
+    private enum BtnKind { Normal, Highlight, Red }
 
-    private static void RenderButton(IntPtr hdc, NativeMethods.RECT r, string text, GitHubBtn style,
+    /// <summary>
+    /// PCL 按钮做法：浅底 + 1px 描边，且**文字颜色 = 描边颜色**（PCL 里 Foreground 绑定 BorderBrush）。
+    /// PCL 没有实心填充按钮 —— 主按钮同样是蓝描边蓝字，只有 hover 才铺一层浅蓝底并把描边提到 #1370F3；
+    /// 危险按钮同理（红描边红字），hover 才铺浅红底。禁用态统一灰 4 描边。
+    /// </summary>
+    private static void RenderButton(IntPtr hdc, NativeMethods.RECT r, string text, BtnKind kind,
         bool hover, bool pressed, bool enabled)
     {
-        Color bg, fg;
-        switch (style)
-        {
-            case GitHubBtn.Primary:
-                bg = !enabled ? Theme.BgSubtle : pressed || hover ? Theme.AccentHover : Theme.Accent;
-                fg = !enabled ? Theme.TextMuted : Color.White;
-                break;
-            case GitHubBtn.Danger:
-                bg = !enabled ? Theme.BgSubtle : pressed || hover ? Theme.DangerHover : Theme.Danger;
-                fg = !enabled ? Theme.TextMuted : Color.White;
-                break;
-            default:
-                bg = !enabled ? Color.FromArgb(0xFA, 0xFA, 0xFA)
-                    : pressed ? Color.FromArgb(0xE8, 0xEA, 0xED)
-                    : hover ? Color.FromArgb(0xF3, 0xF4, 0xF6) : Theme.BgSubtle;
-                fg = Theme.Text;
-                break;
-        }
-        Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom, bg, Theme.Radius);
-        if (style == GitHubBtn.Secondary)
-            Gdi.DrawBorder(hdc, r, Theme.Border, Theme.Radius);
-        Gdi.TextCentered(hdc, text, r.left, r.top, r.right - r.left, r.bottom - r.top, fg, Gdi.FontBold);
+        bool active = enabled && (hover || pressed);
+        Color line = !enabled ? Theme.TextDisabled
+            : kind switch
+            {
+                BtnKind.Highlight => active ? Theme.AccentHover : Theme.Accent,
+                BtnKind.Red => active ? Theme.DangerHover : Theme.Danger,
+                _ => active ? Theme.AccentHover : Theme.AccentInk,
+            };
+        Color fill = !enabled ? Theme.BgSubtle
+            : pressed ? Theme.AccentSoft
+            : active ? (kind == BtnKind.Red ? Theme.DangerSoftBg : Theme.AccentHoverBg)
+            : Theme.Card;
+        Gdi.FillRounded(hdc, r.left, r.top, r.right, r.bottom, fill, Theme.RadiusBtn);
+        Gdi.DrawBorder(hdc, r, line, Theme.RadiusBtn);
+        // 按下时文字下沉 1px，给一点"真的按到了"的手感
+        int dy = pressed ? 1 : 0;
+        Gdi.TextCentered(hdc, text, r.left, r.top + dy, r.right - r.left, r.bottom - r.top, line, Gdi.FontBold);
     }
 }

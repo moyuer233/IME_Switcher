@@ -146,6 +146,15 @@ internal static partial class NativeMethods
     [DllImport("gdi32.dll")] public static extern IntPtr SelectObject(IntPtr hdc, IntPtr hObject);
     [DllImport("gdi32.dll")] public static extern bool DeleteObject(IntPtr hObject);
     [DllImport("gdi32.dll")] public static extern bool Ellipse(IntPtr hdc, int nLeftRect, int nTopRect, int nRightRect, int nBottomRect);
+    // GDI 原生文字：ClearType 子像素抗锯齿（GDI+ 的 AntiAliasGridFit 只有灰阶，小字加粗中文会发糊）
+    [DllImport("gdi32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr CreateFontW(int height, int width, int escapement, int orientation,
+        int weight, uint italic, uint underline, uint strikeOut, uint charSet, uint outPrecision,
+        uint clipPrecision, uint quality, uint pitchAndFamily, string faceName);
+    [DllImport("gdi32.dll")] public static extern uint SetTextColor(IntPtr hdc, uint color);
+    [DllImport("gdi32.dll")] public static extern int SetBkMode(IntPtr hdc, int mode);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int DrawTextW(IntPtr hdc, string text, int count, ref RECT rect, uint format);
 
     // ---------------- shell32（托盘） ----------------
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
