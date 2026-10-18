@@ -11,15 +11,17 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
 </div>
 
 <p align="center">
-  <img src="https://img.shields.io/github/license/moyuer233/IME_Switcher" alt="license">
-  <img src="https://img.shields.io/github/v/release/moyuer233/IME_Switcher" alt="release">
-  <img src="https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total" alt="downloads">
-  <img src="https://img.shields.io/github/commit-activity/m/moyuer233/IME_Switcher" alt="commit activity">
-  <img src="https://img.shields.io/github/last-commit/moyuer233/IME_Switcher" alt="last commit">
+  <a href="https://github.com/moyuer233/IME_Switcher/blob/master/LICENSE"><img alt="license" src="https://img.shields.io/github/license/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=3DA639&logo=github&logoColor=white"/></a>
+  <a href="https://github.com/moyuer233/IME_Switcher/releases"><img alt="release" src="https://img.shields.io/github/v/release/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
+  <a href="https://github.com/moyuer233/IME_Switcher/releases"><img alt="downloads" src="https://img.shields.io/github/downloads/moyuer233/IME_Switcher/total?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
+  <a href="https://github.com/moyuer233/IME_Switcher/commits/master"><img alt="commit activity" src="https://img.shields.io/github/commit-activity/m/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
+  <a href="https://github.com/moyuer233/IME_Switcher/commits/master"><img alt="last commit" src="https://img.shields.io/github/last-commit/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
+</p>
   <br>
-  <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4" alt="platform">
-  <img src="https://img.shields.io/badge/.NET-9-512BD4" alt=".NET">
-  <img src="https://img.shields.io/badge/NativeAOT-single%20file-5C2D91" alt="NativeAOT">
+<p align="center">
+  <a href="https://www.microsoft.com/windows"><img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?style=flat-square&labelColor=161b22&color=0078D4&logo=windows&logoColor=white"/></a>
+  <a href="https://dotnet.microsoft.com"><img alt=".NET" src="https://img.shields.io/badge/.NET-9-512BD4?style=flat-square&labelColor=161b22&color=512BD4&logo=dotnet&logoColor=white"/></a>
+  <a href="https://github.com/moyuer233/IME_Switcher"><img alt="NativeAOT" src="https://img.shields.io/badge/NativeAOT-single%20file-5C2D91?style=flat-square&labelColor=161b22&color=5C2D91"/></a>
 </p>
 
 ## 功能
