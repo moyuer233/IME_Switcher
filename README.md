@@ -17,7 +17,6 @@ _✨ 一个轻量级的 Windows 工具，通过自定义快捷键一键切换中
   <a href="https://github.com/moyuer233/IME_Switcher/commits/master"><img alt="commit activity" src="https://img.shields.io/github/commit-activity/m/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
   <a href="https://github.com/moyuer233/IME_Switcher/commits/master"><img alt="last commit" src="https://img.shields.io/github/last-commit/moyuer233/IME_Switcher?style=flat-square&labelColor=161b22&color=2088FF&logo=github&logoColor=white"/></a>
 </p>
-  <br>
 <p align="center">
   <a href="https://www.microsoft.com/windows"><img alt="platform" src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D4?style=flat-square&labelColor=161b22&color=0078D4&logo=windows&logoColor=white"/></a>
   <a href="https://dotnet.microsoft.com"><img alt=".NET" src="https://img.shields.io/badge/.NET-9-512BD4?style=flat-square&labelColor=161b22&color=512BD4&logo=dotnet&logoColor=white"/></a>
